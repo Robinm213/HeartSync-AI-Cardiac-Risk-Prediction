@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}Model Performance — HeartSync{% endblock %}
+{% block extra_css %}
+<style>
+.perf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.model-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 24px; position: relative; overflow: hidden;
+}
+.model-card::before { content:''; position:absolute; top:0; left:0; width:100%; height:3px; }
+.model-card.gb::before { background: linear-gradient(90deg, #ff4757, #ff6b81); }
+.model-card.rf::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+.model-card.lr::before { background: linear-gradient(90deg, #2ed573, #7bed9f); }
+.model-card.svm::before { background: linear-gradient(90deg, #ffa502, #ffc048); }
+.model-card.lstm::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+.model-name { font-size: 0.9rem; font-weight: 700; margin-bottom: 14px; }
+.metric-row {
+  display: flex; justify-content: space-between; padding: 6px 0;
+  border-bottom: 1px solid var(--border); font-size: 0.82rem;
+}
+.metric-row:last-child { border-bottom: none; }
+.metric-row .mk { color: var(--text-muted); }
+.metric-row .mv { font-family: var(--mono); font-weight: 600; }
+.bar-fill {
+  height: 4px; border-radius: 2px; margin-top: 4px;
+  transition: width 0.6s ease;
+}
+.dataset-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.ds-chip {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; text-align: center;
+}
+.ds-chip .ds-val { font-family: var(--mono); font-size: 1.8rem; font-weight: 800; color: var(--accent); }
+.ds-chip .ds-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hs-container">
+  <h1 class="hs-page-title">Model Performance</h1>
+  <p class="hs-page-subtitle">5 AI models trained on cardiac lifestyle data — comparison & metrics</p>
+
+  <!-- Dataset Info -->
+  <div class="dataset-info">
+    <div class="ds-chip">
+      <div class="ds-val">{{ metadata.dataset_size }}</div>
+      <div class="ds-label">Dataset Size</div>
+    </div>
+    <div class="ds-chip">
+      <div class="ds-val">{{ metadata.features|length }}</div>
+      <div class="ds-label">Features</div>
+    </div>
+    <div class="ds-chip">
+      <div class="ds-val">{{ metadata.train_size }}</div>
+      <div class="ds-label">Train Samples</div>
+    </div>
+    <div class="ds-chip">
+      <div class="ds-val">{{ metadata.test_size }}</div>
+      <div class="ds-label">Test Samples</div>
+    </div>
+    <div class="ds-chip">
+      <div class="ds-val">{{ (metadata.cv_mean * 100)|round(1) }}%</div>
+      <div class="ds-label">CV Accuracy (GB)</div>
+    </div>
+  </div>
+
+  <!-- Model Cards -->
+  <div class="perf-grid">
+    {% set models = [
+      ('Gradient Boosting', 'gb', metadata.gb_metrics, '#ff4757'),
+      ('Random Forest', 'rf', metadata.rf_metrics, '#3b82f6'),
+    ] %}
+    {% if metadata.lr_metrics %}
+      {% set models = models + [('Logistic Regression', 'lr', metadata.lr_metrics, '#2ed573')] %}
+    {% endif %}
+    {% if metadata.svm_metrics %}
+      {% set models = models + [('SVM', 'svm', metadata.svm_metrics, '#ffa502')] %}
+    {% endif %}
+    {% if metadata.lstm_metrics %}
+      {% set models = models + [('LSTM', 'lstm', metadata.lstm_metrics, '#8b5cf6')] %}
+    {% endif %}
+
+    {% for name, cls, m, color in models %}
+    <div class="model-card {{ cls }}">
+      <div class="model-name">{{ name }}</div>
+      {% for label, key in [('Accuracy','accuracy'), ('Precision','precision'), ('Recall','recall'), ('F1 Score','f1'), ('AUC-ROC','auc_roc')] %}
+      <div class="metric-row">
+        <span class="mk">{{ label }}</span>
+        <span class="mv">{{ (m[key] * 100)|round(1) }}%</span>
+      </div>
+      <div style="background:var(--bg-secondary); border-radius:2px; height:4px;">
+        <div class="bar-fill" style="width:{{ m[key] * 100 }}%; background:{{ color }};"></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Charts -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
+    <div class="hs-card">
+      <div class="hs-card-header"><h3>Model Comparison</h3></div>
+      <div class="hs-card-body"><canvas id="compareChart" height="250"></canvas></div>
+    </div>
+    <div class="hs-card">
+      <div class="hs-card-header"><h3>Feature Importances (Top 10)</h3></div>
+      <div class="hs-card-body"><canvas id="featChart" height="250"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Features List -->
+  <div class="hs-card">
+    <div class="hs-card-header"><h3><i class="fas fa-list-check"></i> All {{ metadata.features|length }} Features</h3></div>
+    <div class="hs-card-body">
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        {% for f in metadata.features %}
+        <span style="background:var(--bg-secondary); border:1px solid var(--border); border-radius:6px; padding:5px 12px; font-size:0.78rem; font-family:var(--mono); color:var(--text-secondary);">
+          {{ f }}
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const chartOpts = {
+  grid: 'rgba(255,255,255,0.04)',
+  tick: '#5e5e72'
+};
+
+// Model Comparison
+const modelNames = ['GB', 'RF'];
+const accVals = [{{ metadata.gb_metrics.accuracy*100 }}, {{ metadata.rf_metrics.accuracy*100 }}];
+const f1Vals  = [{{ metadata.gb_metrics.f1*100 }}, {{ metadata.rf_metrics.f1*100 }}];
+const aucVals = [{{ metadata.gb_metrics.auc_roc*100 }}, {{ metadata.rf_metrics.auc_roc*100 }}];
+{% if metadata.lr_metrics %}
+modelNames.push('LR');
+accVals.push({{ metadata.lr_metrics.accuracy*100 }});
+f1Vals.push({{ metadata.lr_metrics.f1*100 }});
+aucVals.push({{ metadata.lr_metrics.auc_roc*100 }});
+{% endif %}
+{% if metadata.svm_metrics %}
+modelNames.push('SVM');
+accVals.push({{ metadata.svm_metrics.accuracy*100 }});
+f1Vals.push({{ metadata.svm_metrics.f1*100 }});
+aucVals.push({{ metadata.svm_metrics.auc_roc*100 }});
+{% endif %}
+{% if metadata.lstm_metrics %}
+modelNames.push('LSTM');
+accVals.push({{ metadata.lstm_metrics.accuracy*100 }});
+f1Vals.push({{ metadata.lstm_metrics.f1*100 }});
+aucVals.push({{ metadata.lstm_metrics.auc_roc*100 }});
+{% endif %}
+
+new Chart(document.getElementById('compareChart'), {
+  type: 'bar',
+  data: {
+    labels: modelNames,
+    datasets: [
+      { label: 'Accuracy', data: accVals, backgroundColor: '#ff4757' },
+      { label: 'F1 Score', data: f1Vals, backgroundColor: '#3b82f6' },
+      { label: 'AUC-ROC', data: aucVals, backgroundColor: '#00d4aa' },
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#9d9daf' } } },
+    scales: {
+      x: { ticks: { color: chartOpts.tick }, grid: { color: chartOpts.grid } },
+      y: { min: 60, max: 100, ticks: { color: chartOpts.tick, callback: v=>v+'%' }, grid: { color: chartOpts.grid } }
+    }
+  }
+});
+
+// Feature Importances
+const featImp = {{ metadata.feature_importances|tojson }};
+const featEntries = Object.entries(featImp).slice(0, 10);
+const featLabels = featEntries.map(e => e[0].replace(/_/g,' ').replace('mg dl','').replace('percent','%'));
+const featValues = featEntries.map(e => (e[1]*100).toFixed(1));
+
+new Chart(document.getElementById('featChart'), {
+  type: 'bar',
+  data: {
+    labels: featLabels,
+    datasets: [{ data: featValues, backgroundColor: '#00d4aa', borderRadius: 4 }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: chartOpts.tick }, grid: { color: chartOpts.grid } },
+      y: { ticks: { color: chartOpts.tick, font: { size: 10 } }, grid: { display: false } }
+    }
+  }
+});
+</script>
+{% endblock %}

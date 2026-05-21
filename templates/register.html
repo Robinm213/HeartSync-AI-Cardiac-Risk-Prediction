@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Get Started — HeartSync{% endblock %}
+{% block extra_css %}
+<style>
+.auth-page {
+  min-height: calc(100vh - 140px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+.auth-box {
+  width: 100%;
+  max-width: 520px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 40px 36px;
+}
+.auth-logo { text-align: center; margin-bottom: 28px; }
+.auth-logo .pulse-dot {
+  width: 14px; height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  animation: pulse-glow 2s infinite;
+}
+.auth-logo span { font-size: 1.3rem; font-weight: 800; }
+.auth-box h2 { font-size: 1.4rem; font-weight: 800; text-align: center; margin-bottom: 6px; }
+.auth-sub { text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 28px; }
+.auth-group { margin-bottom: 16px; }
+.auth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.auth-footer { text-align: center; margin-top: 20px; font-size: 0.85rem; color: var(--text-muted); }
+.watch-hint {
+  background: var(--accent-glow);
+  border: 1px solid rgba(0,212,170,0.15);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 0.8rem;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <span class="pulse-dot"></span><span>HeartSync</span>
+    </div>
+    <h2>Create your account</h2>
+    <p class="auth-sub">Start tracking your cardiac health with AI</p>
+
+    <form method="POST">
+      <div class="auth-group">
+        <label class="hs-label">Full Name</label>
+        <input type="text" name="name" class="hs-input" placeholder="John Doe" required>
+      </div>
+      <div class="auth-group">
+        <label class="hs-label">Email</label>
+        <input type="email" name="email" class="hs-input" placeholder="you@example.com" required>
+      </div>
+      <div class="auth-group">
+        <label class="hs-label">Password</label>
+        <input type="password" name="password" class="hs-input" placeholder="Min 6 characters" required minlength="6">
+      </div>
+      <div class="auth-row">
+        <div class="auth-group">
+          <label class="hs-label">Age</label>
+          <input type="number" name="age" class="hs-input" value="25" min="10" max="100">
+        </div>
+        <div class="auth-group">
+          <label class="hs-label">Gender</label>
+          <select name="gender" class="hs-input">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+      </div>
+      <div class="auth-row">
+        <div class="auth-group">
+          <label class="hs-label">Height (cm)</label>
+          <input type="number" name="height_cm" class="hs-input" value="170" min="100" max="250">
+        </div>
+        <div class="auth-group">
+          <label class="hs-label">Weight (kg)</label>
+          <input type="number" name="weight_kg" class="hs-input" value="70" min="20" max="250">
+        </div>
+      </div>
+
+      <div class="watch-hint">
+        <i class="fa-solid fa-watch"></i>
+        You can connect your Noise smartwatch after registration
+      </div>
+
+      <div class="auth-group">
+        <label class="hs-label">Smartwatch Brand</label>
+        <select name="watch_brand" class="hs-input" id="watchBrand" onchange="updateWatchModels()">
+          <option value="">— Select brand —</option>
+          <option value="Noise">Noise</option>
+          <option value="Fire-Boltt">Fire-Boltt</option>
+          <option value="boAt">boAt</option>
+          <option value="Amazfit">Amazfit</option>
+          <option value="Samsung">Samsung</option>
+          <option value="Xiaomi">Xiaomi / Redmi</option>
+          <option value="Fitbit">Fitbit</option>
+          <option value="Apple">Apple</option>
+          <option value="Realme">Realme</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="auth-group">
+        <label class="hs-label">Watch Model (optional)</label>
+        <input type="text" name="watch_model" class="hs-input" id="watchModel" placeholder="e.g. Halo Plus, Invincible, Ring 3">
+      </div>
+
+      <button type="submit" class="btn-hs btn-hs-primary w-100" style="padding:12px; font-size:0.9rem;">
+        <i class="fas fa-user-plus"></i> Create Account
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a href="{{ url_for('login') }}">Sign in</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

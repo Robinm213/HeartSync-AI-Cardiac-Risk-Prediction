@@ -1,0 +1,806 @@
+{% extends "base.html" %}
+{% block title %}Smartwatch — HeartSync{% endblock %}
+{% block extra_css %}
+<style>
+.watch-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+@media(max-width:900px) { .watch-hero { grid-template-columns: 1fr; } }
+.connect-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.watch-icon-large {
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  margin-bottom: 20px;
+  position: relative;
+}
+.watch-icon-large.connected { border-color: var(--accent); }
+.watch-icon-large .conn-badge {
+  position: absolute;
+  bottom: 4px; right: 4px;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--success);
+  border: 3px solid var(--bg-card);
+  display: none;
+}
+.watch-icon-large.connected .conn-badge { display: block; }
+.connect-panel h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 6px; }
+.connect-panel p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px; }
+.connect-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+.live-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.live-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.live-tile {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+}
+.live-tile .lt-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.live-tile .lt-value {
+  font-family: var(--mono);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.live-tile .lt-unit { font-size: 0.7rem; color: var(--text-muted); }
+.sync-log {
+  margin-top: 16px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+.sync-entry { padding: 4px 0; border-bottom: 1px solid var(--border); }
+
+.methods-section { margin-top: 24px; }
+.method-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.method-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.method-card h4 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.method-card p { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; }
+.method-card .method-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 10px;
+}
+.csv-upload-area {
+  border: 2px dashed var(--border-light);
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  margin-top: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.csv-upload-area:hover { border-color: var(--accent); }
+#uploadStatus { margin-top: 8px; font-size: 0.8rem; }
+
+/* ── Noise IND0925 Guide ── */
+.noise-guide-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.noise-guide-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), #8b5cf6);
+}
+.noise-guide-card h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  display: flex; align-items: center; gap: 10px;
+}
+.noise-guide-card > p {
+  color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px;
+}
+.guide-steps {
+  display: grid; gap: 14px; margin-bottom: 20px;
+}
+.guide-step {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.step-num {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent); color: #0a0a0f;
+  font-weight: 800; font-size: 0.88rem;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.guide-step strong {
+  display: block; font-size: 0.92rem; margin-bottom: 4px;
+  color: var(--text-primary);
+}
+.guide-step p {
+  font-size: 0.82rem; color: var(--text-secondary);
+  line-height: 1.55; margin: 0;
+}
+.metrics-available {
+  background: rgba(34,197,94,0.08);
+  border: 1px solid rgba(34,197,94,0.25);
+  border-radius: 10px; padding: 14px 16px;
+}
+.metrics-available > strong {
+  display: block; font-size: 0.82rem;
+  color: #4ade80; margin-bottom: 10px;
+}
+.metrics-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;
+}
+.metrics-grid span {
+  font-size: 0.75rem; padding: 5px 10px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 20px; color: var(--text-secondary);
+}
+.metrics-available em {
+  display: block; font-size: 0.75rem; color: var(--text-muted);
+  font-style: normal; line-height: 1.5;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hs-container">
+  <h1 class="hs-page-title"><i class="fa-solid fa-watch" style="color:var(--accent);"></i> Smartwatch</h1>
+  <p class="hs-page-subtitle">Connect your smartwatch (Noise / Fire-Boltt / boAt / Samsung / Fitbit etc.) to automatically sync health data</p>
+
+  {% if user and user.watch_brand == 'Noise' %}
+  <div class="noise-guide-card">
+    <h3><i class="fa-solid fa-watch" style="color:var(--accent);"></i> How to Connect Your Noise IND0925 to HeartSync</h3>
+    <p>Your Noise watch doesn't have a direct API. Use this bridge method (Watch → NoiseFit → Google Fit → HeartSync):</p>
+
+    <div class="guide-steps">
+      <div class="guide-step">
+        <span class="step-num">1</span>
+        <div>
+          <strong>Install the NoiseFit app</strong>
+          <p>Download <em>NoiseFit</em> from Google Play Store and pair your IND0925 watch via Bluetooth.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <span class="step-num">2</span>
+        <div>
+          <strong>Enable Google Fit sync</strong>
+          <p>In NoiseFit → Profile → Connected Apps → enable <strong>Google Fit</strong>. Your watch will now push heart rate, SpO₂, steps, sleep and stress data to Google Fit automatically.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <span class="step-num">3</span>
+        <div>
+          <strong>Connect HeartSync to Google Fit</strong>
+          <p>On this page, tap <strong>"Connect Google Fit"</strong> below and sign in with the same Google account NoiseFit is syncing to. HeartSync will then read your live watch data.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <span class="step-num">4</span>
+        <div>
+          <strong>Use it on the Predict page</strong>
+          <p>Once connected, go to <strong>Predict → "From Watch"</strong>. HeartSync will auto-fill Heart Rate, SpO₂, Sleep, Stress and Activity Minutes directly from your watch. You only need to fill the remaining health fields manually.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <span class="step-num">5</span>
+        <div>
+          <strong>Alternative: CSV export</strong>
+          <p>If Google Fit isn't an option: NoiseFit → Profile → Health Data → Export → download the CSV → upload it on this Watch page using the CSV upload card below.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="metrics-available">
+      <strong>📊 Data your IND0925 watch provides to HeartSync</strong>
+      <div class="metrics-grid">
+        <span>❤️ Heart Rate</span>
+        <span>🩸 SpO₂</span>
+        <span>🚶 Steps</span>
+        <span>😴 Sleep Hours</span>
+        <span>🧠 Stress Level</span>
+        <span>🔥 Calories Burned</span>
+      </div>
+      <em>* Blood pressure, cholesterol and blood glucose must be entered manually — your watch does not measure these.</em>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if user and user.watch_brand == 'Samsung' %}
+  <div class="noise-guide-card">
+    <h3><i class="fa-solid fa-watch" style="color:#3b82f6;"></i> How to Connect Your Samsung Galaxy Fit 3 / Watch to HeartSync</h3>
+    <p>Samsung uses <strong>Health Connect</strong> as the bridge between Samsung Health and Google Fit. The path is:
+       <strong>Galaxy Fit 3 → Samsung Health → Health Connect → Google Fit → HeartSync</strong>.</p>
+
+    <div class="guide-steps">
+      <div class="guide-step">
+        <span class="step-num">1</span>
+        <div>
+          <strong>Pair Galaxy Fit 3 with Samsung Health</strong>
+          <p>Install <em>Samsung Health</em> from Play Store and pair your Galaxy Fit 3 (or Galaxy Watch) over Bluetooth. The Galaxy Wearable app may also prompt — install it if asked.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <span class="step-num">2</span>
+        <div>
+          <strong>Install / open Health Connect</strong>
+          <p>Most newer Samsung phones already have <em>Health Connect</em> installed. If not, install it from Play Store. (Settings → Apps → search "Health Connect".)</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <span class="step-num">3</span>
+        <div>
+          <strong>Connect Samsung Health → Health Connect</strong>
+          <p>Open Samsung Health → tap your profile (top-right) → <strong>Settings</strong> → <strong>Health Connect</strong> → tap "Connect to Health Connect" → allow <strong>all</strong> permissions (heart rate, steps, sleep, oxygen, calories).</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <span class="step-num">4</span>
+        <div>
+          <strong>Connect Google Fit → Health Connect</strong>
+          <p>Install <em>Google Fit</em> from Play Store and sign in with your Gmail. Open Fit → Profile → <strong>Settings</strong> → <strong>Manage connected apps</strong> → tap <strong>Health Connect</strong> → enable. Grant <strong>all</strong> data access checkboxes.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <span class="step-num">5</span>
+        <div>
+          <strong>Wear the watch for 5 minutes</strong>
+          <p>Heart rate must be measured at least once for the data pipeline to fill. Then open the Google Fit app and pull-to-refresh — you should see today's heart rate, steps, sleep, etc.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <span class="step-num">6</span>
+        <div>
+          <strong>Connect HeartSync</strong>
+          <p>Below on this page, click <strong>"Connect Google Fit"</strong> and sign in with the <strong>same</strong> Gmail you used in Google Fit + as a Test User in Google Cloud. HeartSync will now read your Galaxy Fit 3 data automatically.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <span class="step-num">7</span>
+        <div>
+          <strong>Alternative: CSV export</strong>
+          <p>If Health Connect isn't an option: Samsung Health → Profile → Settings → <em>Download personal data</em> → choose date range → CSV → upload via the CSV card below.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="metrics-available">
+      <strong>📊 Data your Galaxy Fit 3 provides to HeartSync</strong>
+      <div class="metrics-grid">
+        <span>❤️ Heart Rate</span>
+        <span>🩸 SpO₂</span>
+        <span>🚶 Steps</span>
+        <span>😴 Sleep Hours</span>
+        <span>🧠 Stress Level</span>
+        <span>🔥 Calories Burned</span>
+      </div>
+      <em>* Blood pressure, cholesterol and blood glucose must be entered manually — Galaxy Fit 3 does not measure these.</em>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="watch-hero">
+    <!-- Connection Panel -->
+    <div class="connect-panel">
+      <div class="watch-icon-large" id="watchIcon">
+        <i class="fa-solid fa-watch" style="color:var(--accent);"></i>
+        <div class="conn-badge"></div>
+      </div>
+      <h2 id="watchTitle">
+        {% if wearable and wearable.get('is_connected') %}
+          {{ wearable.get('watch_model', 'Noise Watch') }}
+        {% else %}
+          Connect Your Watch
+        {% endif %}
+      </h2>
+      <p id="watchSubtitle">
+        {% if wearable and wearable.get('is_connected') %}
+          Connected &middot; Battery {{ wearable.get('battery_percent', '--') }}%
+        {% else %}
+          Noise IND0925 / IND0926, Fire-Boltt, boAt or any NoiseFit / Da Fit / Google Fit-compatible watch
+        {% endif %}
+      </p>
+
+      <div class="connect-actions">
+        <button class="btn-hs btn-hs-primary" id="btnConnect" onclick="connectWatch()">
+          <i class="fas fa-bluetooth-b"></i>
+          {% if wearable and wearable.get('is_connected') %}Reconnect{% else %}Connect via BLE{% endif %}
+        </button>
+        <button class="btn-hs btn-hs-outline" id="btnSync" onclick="syncWatch()" {% if not wearable or not wearable.get('is_connected') %}disabled{% endif %}>
+          <i class="fas fa-rotate"></i> Sync Now
+        </button>
+        <button class="btn-hs btn-hs-ghost" id="btnDisconnect" onclick="disconnectWatch()"
+          {% if not wearable or not wearable.get('is_connected') %}style="display:none;"{% endif %}>
+          <i class="fas fa-link-slash"></i> Disconnect
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Data Panel -->
+    <div class="live-panel">
+      <h3 style="font-size:0.78rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:16px;">
+        <span class="status-dot {% if wearable and wearable.get('is_connected') %}online{% else %}offline{% endif %}" id="liveStatusDot"></span>
+        Live Readings
+      </h3>
+      <div class="live-grid">
+        <div class="live-tile">
+          <div class="lt-label">Heart Rate</div>
+          <div class="lt-value" style="color:var(--danger);" id="liveHR">{{ (wearable.heart_rate|int) if (wearable and wearable.heart_rate) else '--' }}</div>
+          <div class="lt-unit">bpm</div>
+        </div>
+        <div class="live-tile">
+          <div class="lt-label">SpO₂</div>
+          <div class="lt-value" style="color:var(--accent);" id="liveSpo2">{{ wearable.spo2 if (wearable and wearable.spo2) else '--' }}</div>
+          <div class="lt-unit">%</div>
+        </div>
+        <div class="live-tile">
+          <div class="lt-label">Steps</div>
+          <div class="lt-value" style="color:#3b82f6;" id="liveSteps">{{ '{:,}'.format(wearable.steps|int) if (wearable and wearable.steps) else '--' }}</div>
+          <div class="lt-unit">today</div>
+        </div>
+        <div class="live-tile">
+          <div class="lt-label">Stress</div>
+          <div class="lt-value" style="color:var(--warning);" id="liveStress">{{ wearable.stress_level if (wearable and wearable.stress_level) else '--' }}</div>
+          <div class="lt-unit">/10</div>
+        </div>
+        <div class="live-tile">
+          <div class="lt-label">Sleep</div>
+          <div class="lt-value" style="color:#8b5cf6;" id="liveSleep">{{ wearable.sleep_hours if (wearable and wearable.sleep_hours) else '--' }}</div>
+          <div class="lt-unit">hrs</div>
+        </div>
+        <div class="live-tile">
+          <div class="lt-label">HRV</div>
+          <div class="lt-value" style="color:#ec4899;" id="liveHRV">{{ wearable.hrv_ms if (wearable and wearable.hrv_ms) else '--' }}</div>
+          <div class="lt-unit">ms</div>
+        </div>
+      </div>
+
+      <div class="sync-log" id="syncLog">
+        <div class="sync-entry" style="color:var(--text-muted);">Sync log will appear here...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Health Alerts -->
+  {% if alerts %}
+  <div style="margin-bottom:24px;">
+    <h3 style="font-size:0.78rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:12px;">
+      <i class="fas fa-triangle-exclamation"></i> Health Alerts
+    </h3>
+    {% for alert in alerts %}
+    <div class="hs-alert {{ alert.level }}">
+      <i class="fas {{ alert.icon }}"></i> {{ alert.message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Connection Methods -->
+  <div class="methods-section">
+    <h3 style="font-size:0.78rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:16px;">
+      Connection Methods
+    </h3>
+    <div class="method-grid">
+      <div class="method-card">
+        <h4><i class="fas fa-bluetooth-b" style="color:#3b82f6;"></i> BLE Direct (Demo)</h4>
+        <p>Connect directly to your Noise smartwatch via Bluetooth Low Energy. In this demo, a BLE simulator generates realistic watch data. For production, the <code>bleak</code> Python library reads actual BLE services.</p>
+        <span class="method-tag" style="background:rgba(59,130,246,0.12); color:#3b82f6;">Active</span>
+      </div>
+      <div class="method-card">
+        <h4><i class="fas fa-file-csv" style="color:var(--accent);"></i> NoiseFit App Export</h4>
+        <p>Export your health data from the NoiseFit app as CSV, then upload it here. Go to <strong>NoiseFit App → Profile → Export Data → CSV</strong>.</p>
+        <span class="method-tag" style="background:var(--success-bg); color:var(--success);">Supported</span>
+        <div class="csv-upload-area" onclick="document.getElementById('csvFile').click()">
+          <i class="fas fa-cloud-arrow-up" style="font-size:1.5rem; color:var(--text-muted); margin-bottom:8px; display:block;"></i>
+          <span style="color:var(--text-secondary); font-size:0.82rem;">Drop CSV here or click to upload</span>
+          <input type="file" id="csvFile" accept=".csv" style="display:none;" onchange="uploadCSV(this)">
+        </div>
+        <div id="uploadStatus"></div>
+      </div>
+      <div class="method-card">
+        <h4><i class="fab fa-google" style="color:#ea4335;"></i> Google Fit Bridge</h4>
+        <p>If your companion app (NoiseFit / Da Fit / boAt Progear / Zepp / Mi Fitness) syncs to Google Fit, HeartSync will read your live data via the Google Fit API.</p>
+
+        {% if not google_fit_status.configured %}
+          <!-- Not configured: show what's missing -->
+          <div style="margin-top:12px; padding:12px 14px; background:var(--warning-bg); border:1px solid rgba(255,165,2,0.25); border-radius:8px; font-size:0.78rem; color:var(--warning); line-height:1.6;">
+            <strong><i class="fas fa-triangle-exclamation"></i> Configuration Incomplete</strong>
+            <ul style="margin:6px 0 0; padding-left:18px;">
+              <li>GOOGLE_CLIENT_ID: {{ '✅ set' if google_fit_status.has_client_id else '❌ missing' }}</li>
+              <li>GOOGLE_CLIENT_SECRET: {{ '✅ set' if google_fit_status.has_client_secret else '❌ missing' }}</li>
+            </ul>
+            <p style="margin:8px 0 4px;">Set these as environment variables before launching <code>python app.py</code>:</p>
+            <code style="display:block; background:rgba(0,0,0,0.3); padding:8px 10px; border-radius:6px; font-size:0.72rem; color:#cbd5e1; line-height:1.5;">
+              # Windows (cmd):<br>
+              set GOOGLE_CLIENT_ID=your_client_id<br>
+              set GOOGLE_CLIENT_SECRET=your_secret<br>
+              python app.py<br><br>
+              # macOS / Linux:<br>
+              export GOOGLE_CLIENT_ID=your_client_id<br>
+              export GOOGLE_CLIENT_SECRET=your_secret<br>
+              python app.py
+            </code>
+            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent); text-decoration:underline; font-size:0.75rem; display:inline-block; margin-top:8px;">
+              <i class="fas fa-up-right-from-square"></i> Open Google Cloud Console
+            </a>
+          </div>
+
+        {% elif google_fit_connected %}
+          <!-- Already connected -->
+          <div style="margin-top:12px; padding:10px 14px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25); border-radius:8px; font-size:0.78rem; color:#22c55e; line-height:1.6;">
+            <strong><i class="fas fa-check-circle"></i> Google Fit Connected</strong><br>
+            HeartSync is reading live data from your watch through Google Fit.
+            <div style="margin-top:8px; color:var(--text-muted); font-size:0.72rem;">
+              Project: <code>{{ google_fit_status.client_id_preview }}</code>
+            </div>
+          </div>
+
+          {% if google_sync_status %}
+            {% if google_sync_status.ok %}
+              <div style="margin-top:10px; padding:10px 14px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; font-size:0.78rem; line-height:1.7;">
+                <strong style="color:var(--accent);">📡 Latest sync from Google Fit:</strong>
+                <div style="display:flex; flex-wrap:wrap; gap:10px 18px; margin-top:6px; font-family:var(--mono);">
+                  {% if google_sync_status.data.heart_rate %}<span>❤️ HR: <strong>{{ google_sync_status.data.heart_rate }}</strong> bpm</span>{% endif %}
+                  {% if google_sync_status.data.steps %}<span>🚶 Steps: <strong>{{ '{:,}'.format(google_sync_status.data.steps) }}</strong></span>{% endif %}
+                  {% if google_sync_status.data.spo2 %}<span>🩸 SpO₂: <strong>{{ google_sync_status.data.spo2 }}%</strong></span>{% endif %}
+                  {% if google_sync_status.data.sleep_hours %}<span>😴 Sleep: <strong>{{ google_sync_status.data.sleep_hours }}h</strong></span>{% endif %}
+                  {% if google_sync_status.data.calories_burned %}<span>🔥 Cal: <strong>{{ google_sync_status.data.calories_burned }}</strong></span>{% endif %}
+                  {% if google_sync_status.data.activity_minutes %}<span>🏃 Active: <strong>{{ google_sync_status.data.activity_minutes }}m</strong></span>{% endif %}
+                </div>
+              </div>
+            {% else %}
+              <div style="margin-top:10px; padding:10px 14px; background:var(--warning-bg); border:1px solid rgba(255,165,2,0.25); border-radius:8px; font-size:0.78rem; color:var(--warning); line-height:1.6;">
+                <strong>⚠️ Sync issue:</strong> {{ google_sync_status.message }}
+              </div>
+            {% endif %}
+          {% endif %}
+
+          <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+            <button type="button" class="btn-hs btn-hs-primary" onclick="syncGoogleFit()">
+              <i class="fas fa-rotate"></i> Sync Now
+            </button>
+            <button type="button" class="btn-hs btn-hs-outline" onclick="disconnectGoogleFit()">
+              <i class="fas fa-link-slash"></i> Disconnect
+            </button>
+            <button type="button" class="btn-hs btn-hs-outline" onclick="showGoogleDebug()" title="Inspect raw Google Fit data sources">
+              <i class="fas fa-bug"></i> Debug
+            </button>
+          </div>
+          <div id="gfStatus" style="margin-top:10px; font-size:0.78rem;"></div>
+          <div id="gfDebug" style="margin-top:10px; font-size:0.72rem; display:none; max-height:280px; overflow:auto; padding:10px 12px; background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; font-family:var(--mono); white-space:pre-wrap; color:var(--text-secondary);"></div>
+
+        {% else %}
+          <!-- Configured but not yet connected for this user -->
+          <div style="margin-top:12px; padding:10px 14px; background:rgba(0,212,170,0.06); border:1px solid rgba(0,212,170,0.2); border-radius:8px; font-size:0.78rem; color:var(--text-secondary); line-height:1.6;">
+            <strong style="color:var(--accent);"><i class="fas fa-circle-info"></i> Ready to connect</strong><br>
+            Project: <code>{{ google_fit_status.client_id_preview }}</code><br>
+            Redirect URI: <code>{{ google_fit_status.redirect_uri }}</code>
+            <div style="margin-top:6px; font-size:0.72rem; color:var(--text-muted);">
+              ⚠️ The redirect URI above must <strong>exactly</strong> match the URI you added under
+              "Authorized redirect URIs" in your OAuth client (Google Cloud Console).
+            </div>
+          </div>
+          <a href="{{ url_for('google_fit_connect') }}" class="btn-hs btn-hs-primary" style="margin-top:12px; display:inline-flex; text-decoration:none;">
+            <i class="fab fa-google"></i> Connect Google Fit
+          </a>
+          <span class="method-tag" style="background:var(--success-bg); color:var(--success);">Ready</span>
+
+          <!-- Troubleshooting accordion -->
+          <details style="margin-top:14px; font-size:0.78rem;">
+            <summary style="cursor:pointer; color:var(--accent); font-weight:600;">
+              <i class="fas fa-bug"></i> Click here if "Connect Google Fit" fails
+            </summary>
+            <div style="background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-top:8px; line-height:1.7; color:var(--text-secondary);">
+              <strong>1. "redirect_uri_mismatch" error?</strong><br>
+              Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent);">Google Cloud Console → Credentials</a> →
+              click your OAuth 2.0 Web client → under <em>Authorized redirect URIs</em> add:<br>
+              <code style="background:rgba(0,0,0,0.3); padding:2px 6px; border-radius:4px;">{{ google_fit_status.redirect_uri }}</code>
+              <br>Save. Wait ~1 minute. Try again.
+              <br><br>
+              <strong>2. "access_denied" / "Error 403: access_denied"?</strong><br>
+              Open <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" style="color:var(--accent);">OAuth consent screen</a> →
+              <em>Test users</em> → <strong>+ Add Users</strong> → enter your Gmail address → save.
+              Only Test Users can sign in while the app is in <em>Testing</em> publishing status.
+              <br><br>
+              <strong>3. "Fitness API has not been used in project … or it is disabled"?</strong><br>
+              Open <a href="https://console.cloud.google.com/apis/library/fitness.googleapis.com" target="_blank" style="color:var(--accent);">Google Cloud → Fitness API</a> → click <strong>Enable</strong>.
+              <br><br>
+              <strong>4. Got connected but "0 data points"?</strong><br>
+              Your watch's data hasn't reached Google Fit yet. On your phone, open NoiseFit (or your watch app) →
+              Profile → Connected Apps → enable <strong>Google Fit</strong> sync. Open the Google Fit app and pull-to-refresh.
+              Wait a few minutes, then click <em>Sync Now</em> here.
+              <br><br>
+              <strong>5. "invalid_client"?</strong><br>
+              Your <code>GOOGLE_CLIENT_ID</code> or <code>GOOGLE_CLIENT_SECRET</code> doesn't match what's in Google Cloud.
+              Re-copy both from the credentials page and restart <code>python app.py</code>.
+            </div>
+          </details>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Wearable History -->
+  {% if history %}
+  <div style="margin-top:24px;">
+    <div class="hs-card">
+      <div class="hs-card-header">
+        <h3><i class="fas fa-clock-rotate-left"></i> Sync History</h3>
+      </div>
+      <div class="hs-card-body" style="padding:0; overflow-x:auto;">
+        <table class="hs-table">
+          <thead><tr><th>Time</th><th>HR</th><th>SpO₂</th><th>Steps</th><th>Sleep</th><th>Stress</th><th>Source</th></tr></thead>
+          <tbody>
+          {% for r in history[:15] %}
+          <tr>
+            <td style="font-family:var(--mono); font-size:0.72rem;">{{ r.recorded_at | ist_short if r.recorded_at else '—' }}</td>
+            <td style="color:var(--danger); font-family:var(--mono);">{{ r.heart_rate|default('—') }}</td>
+            <td style="color:var(--accent); font-family:var(--mono);">{{ r.spo2|default('—') }}%</td>
+            <td style="font-family:var(--mono);">{{ r.steps|default('—') }}</td>
+            <td style="color:#8b5cf6; font-family:var(--mono);">{{ r.sleep_hours|default('—') }}h</td>
+            <td style="font-family:var(--mono);">{{ r.stress_level|default('—') }}</td>
+            <td style="font-size:0.72rem; color:var(--text-muted);">{{ r.source }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const syncLog = document.getElementById('syncLog');
+
+// Pick the most appropriate simulator key for the logged-in user.
+// For Noise users we default to the IND0925 model that the prompt targets.
+const WATCH_KEY = {{
+  ('noise_ind0925' if user and user.watch_brand == 'Noise'
+   else 'fireboltt_ninja' if user and user.watch_brand == 'Fire-Boltt'
+   else 'boat_lunar_pro' if user and user.watch_brand == 'boAt'
+   else 'samsung_fit3'   if user and user.watch_brand == 'Samsung'
+   else 'fitbit_versa4'  if user and user.watch_brand == 'Fitbit'
+   else 'noise_ind0925') | tojson
+}};
+const WATCH_DISPLAY_CODE = {{
+  ('IND0925' if user and user.watch_brand == 'Noise'
+   else 'FB-NJC' if user and user.watch_brand == 'Fire-Boltt'
+   else 'BT-LPL' if user and user.watch_brand == 'boAt'
+   else 'SM-R390' if user and user.watch_brand == 'Samsung'
+   else 'FT-V4'  if user and user.watch_brand == 'Fitbit'
+   else 'IND0925') | tojson
+}};
+
+function log(msg, color='var(--text-muted)') {
+  const t = new Date().toLocaleTimeString();
+  syncLog.innerHTML = `<div class="sync-entry" style="color:${color};">[${t}] ${msg}</div>` + syncLog.innerHTML;
+}
+
+async function connectWatch() {
+  const btn = document.getElementById('btnConnect');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting...';
+  log(`Scanning for watch (${WATCH_DISPLAY_CODE})...`, 'var(--accent)');
+
+  try {
+    const resp = await fetch('/api/watch/connect', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({watch_key: WATCH_KEY})
+    });
+    const data = await resp.json();
+    if(data.status === 'connected') {
+      log(`Connected: ${data.device_name} | FW ${data.firmware} | Battery ${data.battery}%`, 'var(--success)');
+      document.getElementById('watchIcon').classList.add('connected');
+      document.getElementById('watchTitle').textContent = data.device_name;
+      document.getElementById('watchSubtitle').textContent = `Connected · Battery ${data.battery}%`;
+      document.getElementById('liveStatusDot').classList.add('online');
+      document.getElementById('btnSync').disabled = false;
+      document.getElementById('btnDisconnect').style.display = '';
+      btn.innerHTML = '<i class="fas fa-bluetooth-b"></i> Reconnect';
+
+      // Auto-sync after connect
+      setTimeout(() => syncWatch(), 800);
+    }
+  } catch(e) {
+    log('Connection failed: ' + e.message, 'var(--danger)');
+  }
+  btn.disabled = false;
+}
+
+async function syncWatch() {
+  const btn = document.getElementById('btnSync');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+  log('Reading sensors...', 'var(--accent)');
+
+  try {
+    const resp = await fetch('/api/watch/sync', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({watch_key: WATCH_KEY})
+    });
+    const data = await resp.json();
+    if(data.success) {
+      const r = data.reading;
+      const setTile = (id, val, formatter) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (val === null || val === undefined || val === 0 || val === '') {
+          el.textContent = '--';
+        } else {
+          el.textContent = formatter ? formatter(val) : val;
+        }
+      };
+      setTile('liveHR',     r.heart_rate, v => Math.round(v));
+      setTile('liveSpo2',   r.spo2);
+      setTile('liveSteps',  r.steps, v => Number(v).toLocaleString());
+      setTile('liveStress', r.stress_level);
+      setTile('liveSleep',  r.sleep_hours);
+      setTile('liveHRV',    r.hrv_ms);
+      log(`Synced: HR ${r.heart_rate || '--'} bpm | SpO₂ ${r.spo2 || '--'}% | Steps ${r.steps || '--'}`, 'var(--success)');
+
+      if(data.alerts && data.alerts.length > 0) {
+        data.alerts.forEach(a => log(`⚠ ${a.message}`, a.level === 'danger' ? 'var(--danger)' : 'var(--warning)'));
+      }
+    }
+  } catch(e) {
+    log('Sync failed: ' + e.message, 'var(--danger)');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fas fa-rotate"></i> Sync Now';
+}
+
+async function disconnectWatch() {
+  try {
+    await fetch('/api/watch/disconnect', {method: 'POST', headers: {'Content-Type': 'application/json'}});
+    log('Watch disconnected', 'var(--warning)');
+    document.getElementById('watchIcon').classList.remove('connected');
+    document.getElementById('watchTitle').textContent = 'Connect Your Watch';
+    document.getElementById('watchSubtitle').textContent = 'Not connected';
+    document.getElementById('liveStatusDot').classList.remove('online');
+    document.getElementById('btnSync').disabled = true;
+    document.getElementById('btnDisconnect').style.display = 'none';
+  } catch(e) { log('Error: ' + e.message, 'var(--danger)'); }
+}
+
+async function uploadCSV(input) {
+  if(!input.files[0]) return;
+  const formData = new FormData();
+  formData.append('file', input.files[0]);
+  document.getElementById('uploadStatus').innerHTML = '<span style="color:var(--accent);">Uploading...</span>';
+
+  try {
+    const resp = await fetch('/api/watch/upload_csv', {method: 'POST', body: formData});
+    const data = await resp.json();
+    if(data.success) {
+      document.getElementById('uploadStatus').innerHTML = `<span style="color:var(--success);">✓ Imported ${data.imported} readings</span>`;
+      log(`CSV imported: ${data.imported} readings`, 'var(--success)');
+    } else {
+      document.getElementById('uploadStatus').innerHTML = `<span style="color:var(--danger);">${data.message}</span>`;
+    }
+  } catch(e) {
+    document.getElementById('uploadStatus').innerHTML = `<span style="color:var(--danger);">Upload failed</span>`;
+  }
+}
+
+// ── Google Fit live sync ──────────────────────────────────────────────────
+async function syncGoogleFit() {
+  const status = document.getElementById('gfStatus');
+  if (status) status.innerHTML = '<span style="color:var(--accent);"><i class="fas fa-spinner fa-spin"></i> Syncing from Google Fit...</span>';
+  try {
+    const resp = await fetch('/api/watch/google_sync', {method:'POST', headers:{'Content-Type':'application/json'}});
+    const data = await resp.json();
+    if (data.success) {
+      const r = data.reading;
+      if (status) status.innerHTML = `<span style="color:var(--success);">✓ Synced — HR ${r.heart_rate||'-'} bpm · SpO₂ ${r.spo2||'-'}% · Steps ${(r.steps||0).toLocaleString()}</span>`;
+      log(`Google Fit synced: HR=${r.heart_rate||'-'}, Steps=${r.steps||'-'}`, 'var(--success)');
+      setTimeout(() => location.reload(), 800);
+    } else {
+      const msg = data.message || data.error || 'Unknown error';
+      if (status) status.innerHTML = `<span style="color:var(--danger);">✗ ${msg}</span>`;
+      log('Google Fit sync failed: ' + msg, 'var(--danger)');
+    }
+  } catch (e) {
+    if (status) status.innerHTML = `<span style="color:var(--danger);">Network error: ${e.message}</span>`;
+  }
+}
+
+async function disconnectGoogleFit() {
+  if (!confirm('Disconnect HeartSync from Google Fit? You can reconnect any time.')) return;
+  try {
+    await fetch('/api/watch/google_disconnect', {method:'POST', headers:{'Content-Type':'application/json'}});
+    location.reload();
+  } catch (e) { alert('Disconnect failed: ' + e.message); }
+}
+
+async function showGoogleDebug() {
+  const box = document.getElementById('gfDebug');
+  box.style.display = 'block';
+  box.textContent = 'Loading data sources from Google Fit...';
+  try {
+    const resp = await fetch('/api/watch/google_debug');
+    const d = await resp.json();
+    let txt = '';
+    txt += '── LIVE FETCH (last 24h aggregate, then 7d fallback) ──\n';
+    txt += JSON.stringify(d.live_fetch, null, 2) + '\n\n';
+    txt += `── DATA SOURCES (${d.sources_count} total) ──\n`;
+    if (d.sources && d.sources.length) {
+      d.sources.forEach(s => {
+        txt += `• ${s.dataType}\n  app:    ${s.application || '(none)'}\n  device: ${s.device || '(none)'}\n  src:    ${s.name}\n\n`;
+      });
+    } else {
+      txt += '(no data sources)\n';
+    }
+    box.textContent = txt;
+  } catch (e) {
+    box.textContent = 'Debug fetch failed: ' + e.message;
+  }
+}
+
+// Auto-sync every 30 seconds if connected
+setInterval(() => {
+  if(document.getElementById('liveStatusDot').classList.contains('online')) {
+    syncWatch();
+  }
+}, 30000);
+</script>
+{% endblock %}

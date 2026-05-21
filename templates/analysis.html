@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Analysis — HeartSync{% endblock %}
+{% block extra_css %}
+<style>
+.analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+@media(max-width:900px) { .analysis-grid { grid-template-columns: 1fr; } }
+.stat-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+.stat-chip {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px 20px; flex: 1; min-width: 150px;
+}
+.stat-chip .sc-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 4px; }
+.stat-chip .sc-value { font-family: var(--mono); font-size: 1.4rem; font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hs-container">
+  <h1 class="hs-page-title">Health Analysis</h1>
+  <p class="hs-page-subtitle">Detailed breakdown of your cardiac health data and trends</p>
+
+  {% if predictions %}
+  <!-- Quick Stats -->
+  <div class="stat-row">
+    <div class="stat-chip">
+      <div class="sc-label">Total Predictions</div>
+      <div class="sc-value">{{ predictions|length }}</div>
+    </div>
+    <div class="stat-chip">
+      <div class="sc-label">Avg Risk Score</div>
+      <div class="sc-value" style="color:var(--warning);">
+        {{ (predictions|map(attribute='probability')|list|sum / predictions|length)|round(1) }}%
+      </div>
+    </div>
+    <div class="stat-chip">
+      <div class="sc-label">Latest Risk</div>
+      <div class="sc-value">
+        <span class="risk-badge {{ predictions[0].risk_level|lower }}">{{ predictions[0].risk_level }}</span>
+      </div>
+    </div>
+    <div class="stat-chip">
+      <div class="sc-label">Watch Readings</div>
+      <div class="sc-value" style="color:var(--accent);">{{ wearable_history|length }}</div>
+    </div>
+  </div>
+
+  <div class="analysis-grid">
+    <!-- Risk Trend -->
+    <div class="hs-card">
+      <div class="hs-card-header"><h3><i class="fas fa-chart-line"></i> Risk Trend</h3></div>
+      <div class="hs-card-body"><canvas id="riskTrend" height="220"></canvas></div>
+    </div>
+
+    <!-- Risk Distribution -->
+    <div class="hs-card">
+      <div class="hs-card-header"><h3><i class="fas fa-chart-pie"></i> Risk Distribution</h3></div>
+      <div class="hs-card-body"><canvas id="riskPie" height="220"></canvas></div>
+    </div>
+
+    <!-- BP Trend -->
+    <div class="hs-card">
+      <div class="hs-card-header"><h3><i class="fas fa-droplet"></i> Blood Pressure Trend</h3></div>
+      <div class="hs-card-body"><canvas id="bpChart" height="220"></canvas></div>
+    </div>
+
+    <!-- HR from Watch -->
+    <div class="hs-card">
+      <div class="hs-card-header"><h3><i class="fas fa-heart-pulse"></i> Heart Rate (Watch Data)</h3></div>
+      <div class="hs-card-body">
+        {% if wearable_history %}
+        <canvas id="hrWatchChart" height="220"></canvas>
+        {% else %}
+        <div style="text-align:center; padding:40px; color:var(--text-muted);">
+          <p>No watch data yet. Sync your smartwatch to see trends.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Prediction History -->
+  <div class="hs-card">
+    <div class="hs-card-header"><h3><i class="fas fa-table"></i> Prediction History</h3></div>
+    <div class="hs-card-body" style="padding:0; overflow-x:auto;">
+      <table class="hs-table">
+        <thead>
+          <tr><th>Date</th><th>Risk</th><th>Score</th><th>Model</th><th>Source</th><th>HR</th><th>BP</th><th>BMI</th></tr>
+        </thead>
+        <tbody>
+        {% for p in predictions[:20] %}
+        <tr>
+          <td style="font-family:var(--mono); font-size:0.72rem;">{{ p.created_at | ist_short if p.created_at else '—' }}</td>
+          <td><span class="risk-badge {{ p.risk_level|lower }}">{{ p.risk_level }}</span></td>
+          <td style="font-family:var(--mono);">{{ p.probability }}%</td>
+          <td style="font-size:0.75rem;">{{ p.model_used }}</td>
+          <td style="font-size:0.72rem;">
+            {% if p.data_source == 'smartwatch' %}
+            <i class="fa-solid fa-watch" style="color:var(--accent);"></i>
+            {% else %}
+            <i class="fas fa-keyboard" style="color:var(--text-muted);"></i>
+            {% endif %}
+          </td>
+          <td style="font-family:var(--mono); color:var(--danger);">{{ p.heart_rate|default('—') }}</td>
+          <td style="font-family:var(--mono);">{{ p.systolic_bp|default('—') }}/{{ p.diastolic_bp|default('—') }}</td>
+          <td style="font-family:var(--mono);">{{ p.bmi|default('—') }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="hs-card">
+    <div class="hs-card-body" style="text-align:center; padding:60px;">
+      <i class="fas fa-chart-line" style="font-size:3rem; opacity:0.15; display:block; margin-bottom:16px;"></i>
+      <p style="color:var(--text-muted);">No prediction data yet. Run your first prediction to see analysis.</p>
+      <a href="{{ url_for('predict') }}" class="btn-hs btn-hs-primary" style="margin-top:16px;">Start Predicting</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if predictions %}
+<script>
+const chartColors = {
+  grid: 'rgba(255,255,255,0.04)',
+  tick: '#5e5e72'
+};
+const preds = {{ predictions|map(attribute='probability')|list|tojson }};
+const labels = {{ predictions|map(attribute='created_at')|list|tojson }}.map(d => {
+  if (!d) return '';
+  try {
+    const dt = new Date(d.includes('T') ? d : d.replace(' ', 'T') + 'Z');
+    return dt.toLocaleString('en-IN', {timeZone:'Asia/Kolkata', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12:true});
+  } catch(e) { return d.substring(5,16); }
+});
+
+// Risk Trend
+new Chart(document.getElementById('riskTrend'), {
+  type: 'line',
+  data: {
+    labels: labels.slice(0,14).reverse(),
+    datasets: [{
+      data: preds.slice(0,14).reverse(),
+      borderColor: '#00d4aa', backgroundColor: 'rgba(0,212,170,0.08)',
+      fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: chartColors.tick, font:{size:9} }, grid: { color: chartColors.grid } },
+      y: { min:0, max:100, ticks: { color: chartColors.tick, callback: v=>v+'%' }, grid: { color: chartColors.grid } }
+    }
+  }
+});
+
+// Risk Pie
+const riskCounts = {Low:0, Medium:0, High:0};
+{{ predictions|map(attribute='risk_level')|list|tojson }}.forEach(r => { if(riskCounts[r] !== undefined) riskCounts[r]++; });
+new Chart(document.getElementById('riskPie'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Low','Medium','High'],
+    datasets: [{ data: [riskCounts.Low, riskCounts.Medium, riskCounts.High],
+      backgroundColor: ['#2ed573','#ffa502','#ff4757'], borderColor: '#1a1a26', borderWidth: 3 }]
+  },
+  options: { responsive: true, plugins: { legend: { labels: { color: '#9d9daf' } } } }
+});
+
+// BP Chart
+const sysVals = {{ predictions|map(attribute='systolic_bp')|list|tojson }};
+const diaVals = {{ predictions|map(attribute='diastolic_bp')|list|tojson }};
+new Chart(document.getElementById('bpChart'), {
+  type: 'line',
+  data: {
+    labels: labels.slice(0,14).reverse(),
+    datasets: [
+      { label:'Systolic', data: sysVals.slice(0,14).reverse(), borderColor:'#ff4757', tension:0.3, pointRadius:3, borderWidth:2 },
+      { label:'Diastolic', data: diaVals.slice(0,14).reverse(), borderColor:'#3b82f6', tension:0.3, pointRadius:3, borderWidth:2 }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#9d9daf' } } },
+    scales: {
+      x: { ticks: { color: chartColors.tick, font:{size:9} }, grid: { color: chartColors.grid } },
+      y: { ticks: { color: chartColors.tick }, grid: { color: chartColors.grid } }
+    }
+  }
+});
+
+// HR Watch
+{% if wearable_history %}
+const wrLabels = {{ wearable_history|map(attribute='recorded_at')|list|tojson }}.map(d => {
+  if (!d) return '';
+  try {
+    const dt = new Date(d.includes('T') ? d : d.replace(' ', 'T') + 'Z');
+    return dt.toLocaleString('en-IN', {timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit', hour12:true});
+  } catch(e) { return d.substring(11,16); }
+});
+const wrHR = {{ wearable_history|map(attribute='heart_rate')|list|tojson }};
+if(document.getElementById('hrWatchChart')) {
+  new Chart(document.getElementById('hrWatchChart'), {
+    type: 'line',
+    data: {
+      labels: wrLabels.slice(0,20).reverse(),
+      datasets: [{ data: wrHR.slice(0,20).reverse(), borderColor:'#ff4757',
+        backgroundColor:'rgba(255,71,87,0.08)', fill:true, tension:0.3, pointRadius:2, borderWidth:2 }]
+    },
+    options: {
+      responsive: true, plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: chartColors.tick, font:{size:9} }, grid: { color: chartColors.grid } },
+        y: { ticks: { color: chartColors.tick }, grid: { color: chartColors.grid } }
+      }
+    }
+  });
+}
+{% endif %}
+</script>
+{% endif %}
+{% endblock %}

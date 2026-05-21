@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block title %}Emergency Contacts — HeartSync{% endblock %}
+{% block extra_css %}
+<style>
+.contacts-layout { display: grid; grid-template-columns: 1fr 420px; gap: 24px; }
+@media(max-width:900px) { .contacts-layout { grid-template-columns: 1fr; } }
+.contact-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; transition: border-color 0.2s;
+}
+.contact-card:hover { border-color: var(--border-light); }
+.contact-info { display: flex; align-items: center; gap: 14px; }
+.contact-avatar {
+  width: 48px; height: 48px; border-radius: 12px; display: flex;
+  align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;
+}
+.contact-name { font-weight: 700; font-size: 0.95rem; }
+.contact-rel { font-size: 0.75rem; color: var(--text-muted); }
+.contact-email { font-size: 0.78rem; color: var(--text-secondary); font-family: var(--mono); }
+.contact-badges { display: flex; gap: 6px; margin-top: 6px; }
+.cb { font-size: 0.62rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.cb.high { background: var(--danger-bg); color: var(--danger); }
+.cb.medium { background: var(--warning-bg); color: var(--warning); }
+.cb.doctor { background: var(--accent-glow); color: var(--accent); }
+.form-section { margin-bottom: 16px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.toggle-row:last-child { border-bottom: none; }
+.toggle-label { font-size: 0.85rem; color: var(--text-secondary); }
+.toggle-sub { font-size: 0.72rem; color: var(--text-muted); }
+.toggle-switch { position: relative; width: 42px; height: 24px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; cursor: pointer; inset: 0; background: var(--bg-elevated);
+  border-radius: 24px; transition: 0.3s; border: 1px solid var(--border);
+}
+.toggle-slider:before {
+  content: ''; position: absolute; height: 18px; width: 18px; left: 2px; bottom: 2px;
+  background: var(--text-muted); border-radius: 50%; transition: 0.3s;
+}
+input:checked + .toggle-slider { background: var(--accent); border-color: var(--accent); }
+input:checked + .toggle-slider:before { transform: translateX(18px); background: #0a0a0f; }
+.email-status {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
+  border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+}
+.email-status.configured { background: var(--success-bg); color: var(--success); }
+.email-status.not-configured { background: var(--warning-bg); color: var(--warning); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hs-container">
+  <h1 class="hs-page-title">Emergency Contacts</h1>
+  <p class="hs-page-subtitle">
+    Manage contacts who will be automatically notified when a cardiac risk is detected.
+    <strong>You will never see your risk level directly</strong> — only your emergency contacts receive alerts.
+  </p>
+
+  <!-- Email Status -->
+  <div style="margin-bottom: 20px;">
+    {% if email_configured %}
+    <span class="email-status configured"><i class="fas fa-check-circle"></i> Email alerts active</span>
+    {% else %}
+    <span class="email-status not-configured"><i class="fas fa-info-circle"></i> Email not configured — alerts will be logged but not sent. Set SMTP_EMAIL & SMTP_PASSWORD env vars.</span>
+    {% endif %}
+  </div>
+
+  <div class="contacts-layout">
+    <!-- Contacts List -->
+    <div>
+      {% if contacts %}
+      {% for c in contacts %}
+      <div class="contact-card">
+        <div class="contact-info">
+          <div class="contact-avatar" style="background:{% if c.is_doctor %}var(--accent-glow); color:var(--accent);{% else %}var(--danger-bg); color:var(--danger);{% endif %}">
+            <i class="fas {% if c.is_doctor %}fa-user-doctor{% else %}fa-user-shield{% endif %}"></i>
+          </div>
+          <div>
+            <div class="contact-name">{{ c.name }}</div>
+            <div class="contact-rel">{{ c.relationship }}{% if c.is_doctor %} &middot; Doctor{% endif %}</div>
+            <div class="contact-email">{{ c.email }}</div>
+            {% if c.phone %}<div style="font-size:0.72rem; color:var(--text-muted);">{{ c.phone }}</div>{% endif %}
+            <div class="contact-badges">
+              {% if c.notify_high %}<span class="cb high">High Risk</span>{% endif %}
+              {% if c.notify_medium %}<span class="cb medium">Medium Risk</span>{% endif %}
+              {% if c.is_doctor %}<span class="cb doctor">Doctor</span>{% endif %}
+            </div>
+          </div>
+        </div>
+        <form method="POST" action="{{ url_for('delete_contact', cid=c.id) }}">
+          <button type="submit" class="btn-hs btn-hs-ghost" style="font-size:0.75rem; color:var(--danger);"
+                  onclick="return confirm('Remove this contact?')">
+            <i class="fas fa-trash"></i>
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="hs-card">
+        <div class="hs-card-body" style="text-align:center; padding:40px;">
+          <i class="fas fa-user-shield" style="font-size:2.5rem; opacity:0.15; display:block; margin-bottom:12px;"></i>
+          <p style="color:var(--text-muted);">No emergency contacts yet. Add a doctor or family member who should be notified.</p>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Alert History -->
+      {% if alert_history %}
+      <div class="hs-card" style="margin-top:20px;">
+        <div class="hs-card-header"><h3><i class="fas fa-bell"></i> Alert History</h3></div>
+        <div class="hs-card-body" style="padding:0;">
+          <table class="hs-table">
+            <thead><tr><th>Time</th><th>Contact</th><th>Risk</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for a in alert_history %}
+            <tr>
+              <td style="font-family:var(--mono); font-size:0.72rem;">{{ a.sent_at | ist_short if a.sent_at else '—' }}</td>
+              <td>{{ a.contact_name }}</td>
+              <td><span class="risk-badge {{ a.risk_level|lower }}">{{ a.risk_level }}</span></td>
+              <td>
+                {% if a.status == 'sent' %}<span style="color:var(--success);"><i class="fas fa-check"></i> Sent</span>
+                {% elif a.status == 'simulated' %}<span style="color:var(--warning);"><i class="fas fa-flask"></i> Logged</span>
+                {% else %}<span style="color:var(--danger);"><i class="fas fa-xmark"></i> Failed</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Add Contact Form -->
+    <div>
+      <div class="hs-card">
+        <div class="hs-card-header"><h3><i class="fas fa-user-plus"></i> Add Emergency Contact</h3></div>
+        <div class="hs-card-body">
+          <form method="POST">
+            <div class="form-section">
+              <label class="hs-label">Full Name *</label>
+              <input type="text" name="name" class="hs-input" required placeholder="Dr. Sharma / Mom">
+            </div>
+            <div class="form-section">
+              <label class="hs-label">Email Address *</label>
+              <input type="email" name="email" class="hs-input" required placeholder="doctor@hospital.com">
+            </div>
+            <div class="form-row" style="margin-bottom:16px;">
+              <div>
+                <label class="hs-label">Phone (optional)</label>
+                <input type="tel" name="phone" class="hs-input" placeholder="+91 98765 43210">
+              </div>
+              <div>
+                <label class="hs-label">Relationship</label>
+                <select name="relationship" class="hs-input">
+                  <option value="Family">Family</option>
+                  <option value="Doctor">Doctor</option>
+                  <option value="Spouse">Spouse</option>
+                  <option value="Parent">Parent</option>
+                  <option value="Friend">Friend</option>
+                  <option value="Caretaker">Caretaker</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <div class="toggle-row">
+                <div>
+                  <div class="toggle-label">Is this a doctor?</div>
+                  <div class="toggle-sub">Doctors receive more detailed clinical info</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" name="is_doctor" value="1">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div class="toggle-row" style="margin-top:8px;">
+                <div>
+                  <div class="toggle-label" style="color:var(--danger);">🔴 High Risk Alert</div>
+                  <div class="toggle-sub">Email sent immediately when cardiac risk is High (&gt;66%). Recommended for all contacts.</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" name="notify_high" value="1" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div class="toggle-row" style="margin-top:8px;">
+                <div>
+                  <div class="toggle-label" style="color:var(--warning);">🟡 Medium Risk Alert</div>
+                  <div class="toggle-sub">Advisory email when risk is Moderate (33–66%). Optional — recommended for doctors and primary caregivers.</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" name="notify_medium" value="1">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div style="background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-top:12px; font-size:0.78rem; color:var(--text-secondary); line-height:1.6;">
+                <i class="fas fa-info-circle" style="color:var(--accent);"></i>
+                <strong style="color:var(--text-primary);"> Tip:</strong>
+                Enable both High &amp; Medium for doctors. Family members usually only need the High Risk alert.
+              </div>
+            </div>
+
+            <button type="submit" class="btn-hs btn-hs-primary w-100" style="padding:12px;">
+              <i class="fas fa-user-plus"></i> Add Contact
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- How it works -->
+      <div class="hs-card" style="margin-top:16px;">
+        <div class="hs-card-header"><h3><i class="fas fa-shield-heart"></i> How Alerts Work</h3></div>
+        <div class="hs-card-body" style="font-size:0.82rem; color:var(--text-secondary); line-height:1.7;">
+          <p><strong style="color:var(--danger);">🔴 High Risk:</strong> Immediate email is sent to contacts who have <em>High Risk Alert</em> enabled. Includes patient vitals and an urgent action recommendation.</p>
+          <p style="margin-top:8px;"><strong style="color:var(--warning);">🟡 Medium Risk:</strong> Advisory email is sent to contacts who have <em>Medium Risk Alert</em> enabled. Recommends a medical consultation within a few days.</p>
+          <p style="margin-top:8px;"><strong style="color:var(--success);">🟢 Low Risk:</strong> No alert is sent to any contact. Everything looks normal.</p>
+          <p style="margin-top:12px; color:var(--text-muted); font-size:0.78rem;">
+            <i class="fas fa-lock"></i> Your privacy is protected — you will never see your own risk level. Only your trusted emergency contacts receive risk information.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}HeartSync — AI Cardiac Risk Prediction{% endblock %}</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-card: #1a1a26;
+  --bg-card-hover: #22222e;
+  --bg-elevated: #252535;
+  --text-primary: #f0f0f5;
+  --text-secondary: #9d9daf;
+  --text-muted: #5e5e72;
+  --accent: #00d4aa;
+  --accent-glow: rgba(0,212,170,0.15);
+  --danger: #ff4757;
+  --danger-bg: rgba(255,71,87,0.12);
+  --warning: #ffa502;
+  --warning-bg: rgba(255,165,2,0.12);
+  --success: #2ed573;
+  --success-bg: rgba(46,213,115,0.12);
+  --border: rgba(255,255,255,0.06);
+  --border-light: rgba(255,255,255,0.1);
+  --gradient-1: linear-gradient(135deg, #00d4aa 0%, #00b894 100%);
+  --gradient-danger: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
+  --gradient-warning: linear-gradient(135deg, #ffa502 0%, #ffc048 100%);
+  --radius: 14px;
+  --radius-sm: 8px;
+  --font: 'Plus Jakarta Sans', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --shadow-glow: 0 0 30px rgba(0,212,170,0.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+a { color: var(--accent); text-decoration: none; transition: opacity 0.2s; }
+a:hover { opacity: 0.8; color: var(--accent); }
+
+/* ── Navbar ── */
+.hs-nav {
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.hs-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.hs-nav-brand .pulse-dot {
+  width: 10px; height: 10px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse-glow 2s infinite;
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,212,170,0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(0,212,170,0); }
+}
+.hs-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 40px;
+  list-style: none;
+}
+.hs-nav-links a {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+}
+.hs-nav-links a:hover { color: var(--text-primary); background: var(--bg-card); }
+.hs-nav-links a.active { color: var(--accent); background: var(--accent-glow); }
+.hs-nav-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.btn-hs {
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-hs-primary {
+  background: var(--gradient-1);
+  color: #0a0a0f;
+}
+.btn-hs-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+.btn-hs-outline {
+  background: transparent;
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+}
+.btn-hs-outline:hover { border-color: var(--accent); color: var(--accent); }
+.btn-hs-danger { background: var(--danger); color: #fff; }
+.btn-hs-ghost {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.btn-hs-ghost:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
+/* ── Cards ── */
+.hs-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.hs-card:hover { border-color: var(--border-light); }
+.hs-card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hs-card-header h3 {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  margin: 0;
+}
+.hs-card-body { padding: 20px; }
+
+/* ── Metric Tiles ── */
+.metric-tile {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.metric-tile::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 3px;
+}
+.metric-tile.hr::before { background: var(--danger); }
+.metric-tile.spo2::before { background: var(--accent); }
+.metric-tile.steps::before { background: #3b82f6; }
+.metric-tile.stress::before { background: var(--warning); }
+.metric-tile.sleep::before { background: #8b5cf6; }
+.metric-tile.calories::before { background: #f97316; }
+.metric-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.metric-value {
+  font-size: 2rem;
+  font-weight: 800;
+  font-family: var(--mono);
+  line-height: 1;
+}
+.metric-unit {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+/* ── Risk Badge ── */
+.risk-badge {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+.risk-badge.high { background: var(--danger-bg); color: var(--danger); }
+.risk-badge.medium { background: var(--warning-bg); color: var(--warning); }
+.risk-badge.low { background: var(--success-bg); color: var(--success); }
+
+/* ── Forms ── */
+.hs-input {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 0.875rem;
+  padding: 10px 14px;
+  width: 100%;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.hs-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.hs-input::placeholder { color: var(--text-muted); }
+.hs-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  display: block;
+}
+select.hs-input { appearance: none; cursor: pointer; }
+
+/* ── Alerts ── */
+.hs-alert {
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.hs-alert.danger { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(255,71,87,0.2); }
+.hs-alert.warning { background: var(--warning-bg); color: var(--warning); border: 1px solid rgba(255,165,2,0.2); }
+.hs-alert.success { background: var(--success-bg); color: var(--success); border: 1px solid rgba(46,213,115,0.2); }
+
+/* ── Tables ── */
+.hs-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.hs-table th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.hs-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+.hs-table tr:hover td { background: var(--bg-card-hover); }
+
+/* ── Container ── */
+.hs-container { max-width: 1320px; margin: 0 auto; padding: 24px; }
+.hs-page-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.hs-page-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+/* ── Progress Ring ── */
+.ring-container { position: relative; display: inline-flex; }
+.ring-container svg { transform: rotate(-90deg); }
+.ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Connection Status ── */
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.online { background: var(--success); box-shadow: 0 0 6px rgba(46,213,115,0.5); }
+.status-dot.offline { background: var(--text-muted); }
+
+/* ── Footer ── */
+.hs-footer {
+  border-top: 1px solid var(--border);
+  padding: 20px 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  margin-top: 60px;
+}
+
+/* ── Mobile Nav ── */
+.hs-mobile-toggle { display: none; background: none; border: none; color: var(--text-secondary); font-size: 1.2rem; cursor: pointer; }
+@media (max-width: 768px) {
+  .hs-nav-links { display: none; }
+  .hs-mobile-toggle { display: block; }
+  .hs-nav-links.show {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 60px; left: 0; right: 0;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 12px;
+    z-index: 99;
+  }
+  .metric-value { font-size: 1.5rem; }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--bg-elevated); border-radius: 3px; }
+</style>
+{% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="hs-nav">
+  <a class="hs-nav-brand" href="{{ url_for('home') }}">
+    <span class="pulse-dot"></span>
+    HeartSync
+  </a>
+
+  <button class="hs-mobile-toggle" onclick="document.getElementById('navLinks').classList.toggle('show')">
+    <i class="fas fa-bars"></i>
+  </button>
+
+  <ul class="hs-nav-links" id="navLinks">
+    <li><a href="{{ url_for('home') }}" class="{% if request.endpoint == 'home' %}active{% endif %}">Home</a></li>
+    {% if session.user_id %}
+    <li><a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a></li>
+    <li><a href="{{ url_for('watch_dashboard') }}" class="{% if request.endpoint == 'watch_dashboard' %}active{% endif %}">
+      <i class="fa-solid fa-watch" style="font-size:0.7rem;"></i> Watch
+    </a></li>
+    <li><a href="{{ url_for('predict') }}" class="{% if request.endpoint == 'predict' %}active{% endif %}">Predict</a></li>
+    <li><a href="{{ url_for('analysis') }}" class="{% if request.endpoint == 'analysis' %}active{% endif %}">Analysis</a></li>
+    <li><a href="{{ url_for('food_log') }}" class="{% if request.endpoint == 'food_log' %}active{% endif %}">Food</a></li>
+    <li><a href="{{ url_for('weekly_report_page') }}" class="{% if request.endpoint == 'weekly_report_page' %}active{% endif %}">
+      <i class="fas fa-file-medical" style="font-size:0.7rem;"></i> Report
+    </a></li>
+    <li><a href="{{ url_for('emergency_contacts_page') }}" class="{% if request.endpoint == 'emergency_contacts_page' %}active{% endif %}">
+      <i class="fas fa-user-shield" style="font-size:0.7rem;"></i> Contacts
+    </a></li>
+    {% endif %}
+    <li><a href="{{ url_for('performance') }}" class="{% if request.endpoint == 'performance' %}active{% endif %}">Models</a></li>
+  </ul>
+
+  <div class="hs-nav-right">
+    {% if session.user_id %}
+    <span style="font-size:0.82rem; color:var(--text-secondary);">
+      <i class="fas fa-circle-user" style="color:var(--accent);"></i>
+      {{ session.user_name }}
+    </span>
+    <a href="{{ url_for('logout') }}" class="btn-hs btn-hs-ghost" style="font-size:0.78rem;">Sign out</a>
+    {% else %}
+    <a href="{{ url_for('login') }}" class="btn-hs btn-hs-outline">Sign in</a>
+    <a href="{{ url_for('register') }}" class="btn-hs btn-hs-primary">Get Started</a>
+    {% endif %}
+  </div>
+</nav>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="hs-container" style="padding-bottom:0;">
+  {% for cat, msg in messages %}
+  <div class="hs-alert {{ cat }}">
+    <i class="fas fa-{% if cat == 'success' %}check-circle{% elif cat == 'danger' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+    {{ msg }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+{% block content %}{% endblock %}
+
+<footer class="hs-footer">
+  <span style="color:var(--accent);">●</span> HeartSync — AI-Powered Cardiac Risk Prediction &middot; For research & educational purposes only
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

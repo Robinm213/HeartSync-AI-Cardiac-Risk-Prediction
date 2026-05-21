@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — HeartSync{% endblock %}
+{% block extra_css %}
+<style>
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+.watch-status {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 6px 16px; font-size: 0.78rem;
+}
+.chart-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+@media(max-width:900px) { .chart-grid { grid-template-columns: 1fr; } }
+.risk-gauge {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 30px;
+}
+.risk-gauge .gauge-value {
+  font-family: var(--mono); font-size: 3.5rem; font-weight: 800; line-height: 1;
+}
+.risk-gauge .gauge-label {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted); margin-top: 8px;
+}
+.quick-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.alerts-section { margin-bottom: 24px; }
+.bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media(max-width:900px) { .bottom-grid { grid-template-columns: 1fr; } }
+
+/* ── Today's Food Summary card ── */
+.food-macros-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 10px; margin: 4px 0 14px;
+}
+.macro-tile {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 8px;
+  text-align: center;
+}
+.macro-tile.cal  { border-top: 2px solid #f97316; }
+.macro-tile.pro  { border-top: 2px solid #22c55e; }
+.macro-tile.carb { border-top: 2px solid #3b82f6; }
+.macro-tile.fat  { border-top: 2px solid #f59e0b; }
+.macro-tile .macro-value {
+  font-family: var(--mono);
+  font-size: 1.4rem; font-weight: 800;
+  color: var(--text-primary);
+}
+.macro-tile .macro-label {
+  font-size: 0.68rem; color: var(--text-muted);
+  margin-top: 4px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.recent-food-list {
+  border-top: 1px solid var(--border);
+  padding-top: 8px; margin-top: 8px;
+}
+.food-log-row {
+  display: flex; justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+.food-log-row:last-child { border-bottom: none; }
+.food-log-name { color: var(--text-primary); }
+.food-log-cal  { color: var(--warning); font-family: var(--mono); font-weight: 600; }
+.no-food-msg {
+  color: var(--text-muted); font-size: 0.82rem;
+  text-align: center; padding: 14px 0;
+}
+.food-predict-notice {
+  margin-top: 12px; padding: 10px 14px;
+  background: rgba(59,130,246,0.08);
+  border-left: 3px solid #3b82f6;
+  border-radius: 6px; font-size: 0.78rem; color: #93c5fd;
+}
+@media (max-width: 600px) { .food-macros-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hs-container">
+  <!-- Header -->
+  <div class="dash-header">
+    <div>
+      <h1 class="hs-page-title">
+        Good {{ 'morning' if now().hour < 12 else ('afternoon' if now().hour < 17 else 'evening') }}, {{ user['name'].split()[0] }}
+      </h1>
+      <p class="hs-page-subtitle" style="margin-bottom:0;">Your cardiac health overview</p>
+    </div>
+    <div class="quick-actions">
+      {% if wearable and wearable.get('is_connected') %}
+      <span class="watch-status">
+        <span class="status-dot online"></span>
+        {{ wearable.get('watch_model', 'Noise Watch') }} &middot; {{ wearable.get('battery_percent', '--') }}%
+        <i class="fas fa-battery-three-quarters" style="color:var(--success);"></i>
+      </span>
+      {% else %}
+      <a href="{{ url_for('watch_dashboard') }}" class="btn-hs btn-hs-outline" style="font-size:0.78rem;">
+        <i class="fa-solid fa-watch"></i> Connect Watch
+      </a>
+      {% endif %}
+      <a href="{{ url_for('predict') }}" class="btn-hs btn-hs-primary" style="font-size:0.78rem;">
+        <i class="fas fa-heartbeat"></i> New Prediction
+      </a>
+    </div>
+  </div>
+
+  <!-- Health Alerts -->
+  {% if alerts %}
+  <div class="alerts-section">
+    {% for alert in alerts %}
+    <div class="hs-alert {{ alert.level }}">
+      <i class="fas {{ alert.icon }}"></i> {{ alert.message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Metric Tiles -->
+  <div class="dash-grid">
+    <div class="metric-tile hr">
+      <div class="metric-label"><i class="fas fa-heart" style="color:var(--danger);"></i> Heart Rate</div>
+      <div class="metric-value" style="color:var(--danger);">
+        {% if wearable and wearable.heart_rate %}{{ wearable.heart_rate|int }}<span class="metric-unit">bpm</span>{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+      </div>
+    </div>
+    <div class="metric-tile spo2">
+      <div class="metric-label"><i class="fas fa-lungs" style="color:var(--accent);"></i> SpO₂</div>
+      <div class="metric-value" style="color:var(--accent);">
+        {% if wearable and wearable.spo2 %}{{ wearable.spo2 }}<span class="metric-unit">%</span>{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+      </div>
+    </div>
+    <div class="metric-tile steps">
+      <div class="metric-label"><i class="fas fa-shoe-prints" style="color:#3b82f6;"></i> Steps</div>
+      <div class="metric-value" style="color:#3b82f6;">
+        {% if wearable and wearable.steps %}{{ '{:,}'.format(wearable.steps|int) }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+      </div>
+    </div>
+    <div class="metric-tile stress">
+      <div class="metric-label"><i class="fas fa-brain" style="color:var(--warning);"></i> Stress</div>
+      <div class="metric-value" style="color:var(--warning);">
+        {% if wearable and wearable.stress_level %}{{ wearable.stress_level }}<span class="metric-unit">/10</span>{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+      </div>
+    </div>
+    <div class="metric-tile sleep">
+      <div class="metric-label"><i class="fas fa-moon" style="color:#8b5cf6;"></i> Sleep</div>
+      <div class="metric-value" style="color:#8b5cf6;">
+        {% if wearable and wearable.sleep_hours %}{{ wearable.sleep_hours }}<span class="metric-unit">hrs</span>{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+      </div>
+    </div>
+    <div class="metric-tile calories">
+      <div class="metric-label"><i class="fas fa-fire" style="color:#f97316;"></i> Calories</div>
+      <div class="metric-value" style="color:#f97316;">
+        {% if wearable and wearable.calories_burned %}{{ wearable.calories_burned|int }}<span class="metric-unit">kcal</span>{% elif today_calories %}{{ today_calories }}<span class="metric-unit">kcal</span>{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="chart-grid">
+    <!-- Risk Trend -->
+    <div class="hs-card">
+      <div class="hs-card-header">
+        <h3><i class="fas fa-chart-line"></i> Risk Score Trend</h3>
+      </div>
+      <div class="hs-card-body">
+        {% if latest_pred %}
+        <canvas id="riskChart" height="200"></canvas>
+        {% else %}
+        <div style="text-align:center; padding:40px; color:var(--text-muted);">
+          <i class="fas fa-chart-line" style="font-size:2rem; margin-bottom:12px; display:block; opacity:0.3;"></i>
+          <p>No predictions yet. Run your first prediction to see trends.</p>
+          <a href="{{ url_for('predict') }}" class="btn-hs btn-hs-primary" style="margin-top:12px;">Get Started</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Latest Risk -->
+    <div class="hs-card">
+      <div class="hs-card-header">
+        <h3><i class="fas fa-heart-circle-check"></i> Latest Risk</h3>
+      </div>
+      <div class="hs-card-body risk-gauge">
+        {% if latest_pred %}
+        <div class="gauge-value" style="color:{% if latest_pred.risk_level == 'High' %}var(--danger){% elif latest_pred.risk_level == 'Medium' %}var(--warning){% else %}var(--success){% endif %};">
+          {{ latest_pred.probability }}%
+        </div>
+        <div class="gauge-label">cardiac risk probability</div>
+        <div style="margin-top:16px;">
+          <span class="risk-badge {{ latest_pred.risk_level|lower }}">{{ latest_pred.risk_level }} Risk</span>
+        </div>
+        <div style="margin-top:12px; font-size:0.75rem; color:var(--text-muted);">
+          via {{ latest_pred.model_used }}
+          {% if latest_pred.data_source == 'smartwatch' %}
+          <br><i class="fa-solid fa-watch" style="color:var(--accent);"></i> Watch data
+          {% endif %}
+        </div>
+        {% else %}
+        <div style="text-align:center; color:var(--text-muted);">
+          <i class="fas fa-heart-circle-check" style="font-size:2.5rem; opacity:0.2; margin-bottom:12px; display:block;"></i>
+          <p>No prediction yet</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Heart Rate Chart + Recent Predictions -->
+  <div class="bottom-grid">
+    <!-- HR Trend from Watch -->
+    <div class="hs-card">
+      <div class="hs-card-header">
+        <h3><i class="fas fa-heart-pulse"></i> Heart Rate (Watch)</h3>
+      </div>
+      <div class="hs-card-body">
+        {% if hr_values and hr_values != '[]' %}
+        <canvas id="hrChart" height="200"></canvas>
+        {% else %}
+        <div style="text-align:center; padding:30px; color:var(--text-muted);">
+          <i class="fa-solid fa-watch" style="font-size:2rem; opacity:0.2; margin-bottom:12px; display:block;"></i>
+          <p>Sync your smartwatch to see heart rate trends</p>
+          <a href="{{ url_for('watch_dashboard') }}" class="btn-hs btn-hs-outline" style="margin-top:10px; font-size:0.78rem;">Connect Watch</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Recent Predictions Table -->
+    <div class="hs-card">
+      <div class="hs-card-header">
+        <h3><i class="fas fa-clock-rotate-left"></i> Recent Predictions</h3>
+      </div>
+      <div class="hs-card-body" style="padding:0;">
+        {% if predictions %}
+        <table class="hs-table">
+          <thead><tr><th>Date</th><th>Risk</th><th>Score</th><th>Steps</th><th>Model</th></tr></thead>
+          <tbody>
+          {% for p in predictions[:8] %}
+          <tr>
+            <td style="font-family:var(--mono); font-size:0.75rem;">
+              {{ p.created_at | ist_short if p.created_at else '—' }}
+            </td>
+            <td><span class="risk-badge {{ p.risk_level|lower }}">{{ p.risk_level }}</span></td>
+            <td style="font-family:var(--mono);">{{ p.probability }}%</td>
+            <td style="font-family:var(--mono); font-size:0.75rem;">
+              {% set sv = p['steps'] if 'steps' in p.keys() else 0 %}
+              {{ sv|default(0) }}
+            </td>
+            <td style="font-size:0.75rem; color:var(--text-muted);">{{ p.model_used[:8] }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div style="text-align:center; padding:30px; color:var(--text-muted);">No predictions yet</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Today's Food Log Summary -->
+  <div class="hs-card food-summary-card" style="margin-top:20px;">
+    <div class="hs-card-header" style="display:flex; align-items:center; justify-content:space-between;">
+      <h3><i class="fas fa-utensils"></i> Today's Food Log</h3>
+      <a href="{{ url_for('food_log') }}" class="btn-hs btn-hs-outline" style="font-size:0.75rem;">View All →</a>
+    </div>
+    <div class="hs-card-body">
+      <div class="food-macros-grid">
+        <div class="macro-tile cal">
+          <div class="macro-value" id="dash-cals">{{ today_calories|default(0) }}</div>
+          <div class="macro-label">🔥 Calories</div>
+        </div>
+        <div class="macro-tile pro">
+          <div class="macro-value" id="dash-protein">—</div>
+          <div class="macro-label">💪 Protein (g)</div>
+        </div>
+        <div class="macro-tile carb">
+          <div class="macro-value" id="dash-carbs">—</div>
+          <div class="macro-label">🍞 Carbs (g)</div>
+        </div>
+        <div class="macro-tile fat">
+          <div class="macro-value" id="dash-fat">—</div>
+          <div class="macro-label">🧈 Fat (g)</div>
+        </div>
+      </div>
+
+      {% if food_logs %}
+      <div class="recent-food-list">
+        <p style="font-size:0.75rem; color:var(--text-muted); margin: 8px 0 4px;">Recent entries today:</p>
+        {% for log in food_logs[:5] %}
+        <div class="food-log-row">
+          <span class="food-log-name">{{ log.food_name }}</span>
+          <span class="food-log-cal">{{ log.calories }} kcal</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="no-food-msg">No food logged today. <a href="{{ url_for('food_log') }}" style="color:var(--accent);">Log your first meal →</a></p>
+      {% endif %}
+
+      <div class="food-predict-notice" id="food-predict-notice" style="{% if not today_calories or today_calories == 0 %}display:none;{% endif %}">
+        <i class="fas fa-info-circle"></i>
+        Your logged food data is used to auto-fill the dietary fields on the
+        <a href="{{ url_for('predict') }}" style="color:#3b82f6; font-weight:600;">Predict page</a>.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Risk Trend Chart
+const trendLabels = {{ trend_labels|safe }};
+const trendProbs  = {{ trend_probs|safe }};
+if(trendLabels.length > 0) {
+  new Chart(document.getElementById('riskChart'), {
+    type: 'line',
+    data: {
+      labels: trendLabels,
+      datasets: [{
+        label: 'Risk Score %',
+        data: trendProbs,
+        borderColor: '#00d4aa',
+        backgroundColor: 'rgba(0,212,170,0.08)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 4,
+        pointBackgroundColor: '#00d4aa',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#5e5e72', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { min: 0, max: 100, ticks: { color: '#5e5e72', callback: v => v+'%' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+}
+
+// HR Chart
+const hrLabels = {{ hr_labels|safe }};
+const hrValues = {{ hr_values|safe }};
+if(hrLabels.length > 0) {
+  new Chart(document.getElementById('hrChart'), {
+    type: 'line',
+    data: {
+      labels: hrLabels,
+      datasets: [{
+        label: 'BPM',
+        data: hrValues,
+        borderColor: '#ff4757',
+        backgroundColor: 'rgba(255,71,87,0.08)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: '#ff4757',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#5e5e72', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: '#5e5e72' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+}
+
+// Pull today's food log totals to fill macros (protein / carbs / fat)
+fetch('/api/food/today_summary')
+  .then(r => r.json())
+  .then(d => {
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = (val !== undefined && val !== null) ? val : 0;
+    };
+    set('dash-cals',    d.calories);
+    set('dash-protein', d.protein);
+    set('dash-carbs',   d.carbs);
+    set('dash-fat',     d.fat);
+    const notice = document.getElementById('food-predict-notice');
+    if (notice) notice.style.display = (d.item_count > 0) ? '' : 'none';
+  })
+  .catch(() => {});
+</script>
+{% endblock %}

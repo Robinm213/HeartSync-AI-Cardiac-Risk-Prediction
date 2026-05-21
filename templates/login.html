@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Sign In — HeartSync{% endblock %}
+{% block extra_css %}
+<style>
+.auth-page {
+  min-height: calc(100vh - 140px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.auth-box {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 40px 36px;
+}
+.auth-logo {
+  text-align: center;
+  margin-bottom: 28px;
+}
+.auth-logo .pulse-dot {
+  width: 14px; height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  animation: pulse-glow 2s infinite;
+}
+.auth-logo span { font-size: 1.3rem; font-weight: 800; }
+.auth-box h2 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 6px;
+}
+.auth-sub {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 28px;
+}
+.auth-group { margin-bottom: 18px; }
+.auth-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <span class="pulse-dot"></span><span>HeartSync</span>
+    </div>
+    <h2>Welcome back</h2>
+    <p class="auth-sub">Sign in to access your cardiac dashboard</p>
+
+    <form method="POST">
+      <div class="auth-group">
+        <label class="hs-label">Email</label>
+        <input type="email" name="email" class="hs-input" placeholder="you@example.com" required>
+      </div>
+      <div class="auth-group">
+        <label class="hs-label">Password</label>
+        <input type="password" name="password" class="hs-input" placeholder="••••••••" required>
+      </div>
+      <button type="submit" class="btn-hs btn-hs-primary w-100" style="padding:12px; font-size:0.9rem; margin-top:8px;">
+        <i class="fas fa-arrow-right-to-bracket"></i> Sign In
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Don't have an account? <a href="{{ url_for('register') }}">Create one</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

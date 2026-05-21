@@ -1,0 +1,651 @@
+{% extends "base.html" %}
+{% block title %}Food Log — HeartSync{% endblock %}
+{% block extra_css %}
+<style>
+.food-layout { display: grid; grid-template-columns: 1fr 420px; gap: 24px; }
+@media(max-width:900px) { .food-layout { grid-template-columns: 1fr; } }
+.calorie-ring { text-align: center; padding: 24px; }
+.cal-value { font-family: var(--mono); font-size: 2.5rem; font-weight: 800; }
+.cal-label { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+.food-search-box { position: relative; }
+.food-results {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 10;
+  background: var(--bg-elevated); border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm); max-height: 300px; overflow-y: auto; display: none;
+}
+.food-results.show { display: block; }
+.food-result-item {
+  padding: 10px 14px; cursor: pointer; display: flex;
+  justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--border); font-size: 0.85rem; transition: background 0.15s;
+}
+.food-result-item:hover { background: var(--bg-card-hover); }
+.fr-cal { font-family: var(--mono); color: var(--warning); font-size: 0.82rem; }
+
+/* Full nutrition card for search/recognition */
+.food-result-card {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.15s;
+}
+.food-result-card:hover { background: var(--bg-card-hover); }
+.food-result-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px; gap: 8px;
+}
+.food-result-name { font-weight: 700; font-size: 0.88rem; color: var(--text-primary); }
+.food-category-badge {
+  font-size: 0.62rem; font-weight: 600; background: rgba(99,102,241,0.15);
+  color: #a5b4fc; padding: 2px 8px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.food-nutrition-row {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  font-size: 0.72rem; color: var(--text-secondary);
+}
+.food-nutrition-row span { white-space: nowrap; }
+
+#logStatus, #photoLogStatus { margin-top: 8px; font-size: 0.82rem; min-height: 20px; }
+
+/* ── Camera Modal ── */
+.camera-modal {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.92); align-items: center; justify-content: center;
+  flex-direction: column;
+}
+.camera-modal.show { display: flex; }
+.camera-header {
+  position: absolute; top: 0; left: 0; right: 0; padding: 16px 24px;
+  display: flex; justify-content: space-between; align-items: center; z-index: 2;
+}
+.camera-header h3 { font-size: 0.9rem; font-weight: 600; color: #fff; margin: 0; }
+.cam-close { background: rgba(255,255,255,0.15); border: none; color: #fff; width: 36px; height: 36px;
+  border-radius: 50%; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.cam-close:hover { background: rgba(255,255,255,0.25); }
+#cameraVideo {
+  width: 100%; max-width: 500px; max-height: 60vh; border-radius: 16px;
+  object-fit: cover; background: #000; border: 2px solid rgba(255,255,255,0.1);
+}
+#cameraCanvas { display: none; }
+.cam-controls {
+  margin-top: 20px; display: flex; gap: 16px; align-items: center;
+}
+.cam-shutter {
+  width: 68px; height: 68px; border-radius: 50%; border: 4px solid #fff;
+  background: transparent; cursor: pointer; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.cam-shutter:hover { background: rgba(255,255,255,0.15); }
+.cam-shutter::after {
+  content: ''; width: 52px; height: 52px; border-radius: 50%;
+  background: #fff; display: block; transition: transform 0.1s;
+}
+.cam-shutter:active::after { transform: scale(0.88); }
+.cam-switch {
+  background: rgba(255,255,255,0.15); border: none; color: #fff;
+  width: 44px; height: 44px; border-radius: 50%; font-size: 1.1rem;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.cam-error { color: var(--danger); font-size: 0.85rem; padding: 20px; text-align: center; max-width: 400px; }
+
+/* ── Snap Preview Section ── */
+.snap-section { margin-top: 16px; }
+.snap-preview {
+  border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border);
+  position: relative; max-height: 220px;
+}
+.snap-preview img { width: 100%; height: auto; display: block; max-height: 220px; object-fit: cover; }
+.snap-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0; padding: 10px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  display: flex; justify-content: space-between; align-items: center;
+}
+.snap-retake { background: rgba(255,255,255,0.2); border: none; color: #fff; padding: 6px 12px;
+  border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; font-family: var(--font); }
+.ai-result-card {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 16px; margin-top: 12px;
+}
+.ai-food-name { font-size: 0.95rem; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.ai-macros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.ai-macro { text-align: center; background: var(--bg-primary); border-radius: 8px; padding: 8px 4px; }
+.am-val { font-family: var(--mono); font-size: 1rem; font-weight: 700; }
+.am-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 2px; }
+.conf-badge { font-size: 0.6rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
+.conf-badge.high { background: var(--success-bg); color: var(--success); }
+.conf-badge.medium { background: var(--warning-bg); color: var(--warning); }
+.conf-badge.low { background: var(--danger-bg); color: var(--danger); }
+
+/* ── Camera Trigger Buttons ── */
+.snap-trigger {
+  display: flex; gap: 10px; justify-content: center; padding: 20px;
+}
+.snap-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 20px 24px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--bg-secondary); cursor: pointer; transition: all 0.2s;
+  color: var(--text-secondary); font-family: var(--font); font-size: 0.78rem; font-weight: 600;
+  flex: 1;
+}
+.snap-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.05); }
+.snap-btn i { font-size: 1.5rem; }
+.snap-btn.active { border-color: var(--accent); color: var(--accent); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Camera Fullscreen Modal -->
+<div class="camera-modal" id="cameraModal">
+  <div class="camera-header">
+    <h3><i class="fas fa-camera"></i> Snap Your Food</h3>
+    <button class="cam-close" onclick="closeCamera()"><i class="fas fa-xmark"></i></button>
+  </div>
+  <video id="cameraVideo" autoplay playsinline></video>
+  <canvas id="cameraCanvas"></canvas>
+  <div id="cameraError" class="cam-error" style="display:none;"></div>
+  <div class="cam-controls">
+    <button class="cam-switch" onclick="switchCamera()" title="Switch camera"><i class="fas fa-camera-rotate"></i></button>
+    <button class="cam-shutter" onclick="capturePhoto()" title="Take photo"></button>
+    <div style="width:44px;"></div>
+  </div>
+</div>
+
+<div class="hs-container">
+  <h1 class="hs-page-title">Food & Nutrition</h1>
+  <p class="hs-page-subtitle">Track meals by snapping a photo, searching, or entering manually</p>
+
+  <div class="food-layout">
+    <!-- Food Log List -->
+    <div>
+      <div class="hs-card">
+        <div class="hs-card-header"><h3><i class="fas fa-list"></i> Today's Log</h3></div>
+        <div class="hs-card-body" style="padding:0;">
+          {% if logs %}
+          <table class="hs-table">
+            <thead><tr><th>Food</th><th>Calories</th><th>Protein</th><th>Source</th><th>Time</th></tr></thead>
+            <tbody>
+            {% for l in logs %}
+            <tr>
+              <td style="font-weight:500;">{{ l.food_name }}</td>
+              <td style="font-family:var(--mono); color:var(--warning);">{{ l.calories }} kcal</td>
+              <td style="font-family:var(--mono); font-size:0.78rem;">{{ l.protein|default(0)|round(0)|int }}g</td>
+              <td>
+                {% if l.source == 'ai_photo' %}<span style="font-size:0.7rem; color:var(--accent);"><i class="fas fa-camera"></i> Photo</span>
+                {% elif l.source == 'search' %}<span style="font-size:0.7rem; color:#3b82f6;"><i class="fas fa-search"></i> Search</span>
+                {% else %}<span style="font-size:0.7rem; color:var(--text-muted);"><i class="fas fa-keyboard"></i> Manual</span>{% endif %}
+              </td>
+              <td style="font-family:var(--mono); font-size:0.72rem; color:var(--text-muted);">{{ l.logged_at | ist_short if l.logged_at else '-' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div style="text-align:center; padding:40px; color:var(--text-muted);">
+            <i class="fas fa-utensils" style="font-size:2rem; opacity:0.15; display:block; margin-bottom:12px;"></i>
+            <p>No food logged today. Snap a photo of your meal to get started!</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div>
+      <!-- Calorie Summary -->
+      <div class="hs-card" style="margin-bottom:16px;">
+        <div class="hs-card-header"><h3><i class="fas fa-fire"></i> Today's Calories</h3></div>
+        <div class="calorie-ring">
+          <div class="cal-value" style="color:{% if today_calories > 2500 %}var(--danger){% elif today_calories > 1800 %}var(--warning){% else %}var(--success){% endif %};">{{ today_calories }}</div>
+          <div class="cal-label">of 2,000 kcal goal</div>
+          <div style="margin-top:12px; background:var(--bg-secondary); border-radius:4px; height:8px; overflow:hidden;">
+            <div style="height:100%; border-radius:4px; width:{{ min(100, (today_calories / 2000 * 100))|int }}%; background:{% if today_calories > 2500 %}var(--danger){% elif today_calories > 1800 %}var(--warning){% else %}var(--accent){% endif %};"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Snap & Log — Camera + Gallery -->
+      <div class="hs-card" style="margin-bottom:16px;">
+        <div class="hs-card-header"><h3><i class="fas fa-camera"></i> Snap & Log</h3></div>
+        <div class="hs-card-body" style="padding:12px;">
+          <!-- Camera / Gallery Triggers -->
+          <div class="snap-trigger" id="snapTrigger">
+            <div class="snap-btn" onclick="openCamera()">
+              <i class="fas fa-camera"></i>
+              Open Camera
+            </div>
+            <label class="snap-btn">
+              <i class="fas fa-image"></i>
+              Upload Photo
+              <input type="file" accept="image/*" style="display:none;" onchange="handleGalleryImage(this)">
+            </label>
+          </div>
+
+          <!-- Photo Preview (hidden until photo taken) -->
+          <div class="snap-section" id="snapSection" style="display:none;">
+            <div class="snap-preview">
+              <img id="snapPreview" src="" alt="Food photo">
+              <div class="snap-overlay">
+                <span style="color:#fff; font-size:0.75rem;"><i class="fas fa-check-circle"></i> Photo captured</span>
+                <button class="snap-retake" onclick="retakePhoto()"><i class="fas fa-redo"></i> Retake</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Processing -->
+          <div id="aiProcessing" style="display:none; text-align:center; padding:20px;">
+            <div style="width:48px; height:48px; border-radius:50%; background:var(--accent-glow); margin:0 auto 12px; display:flex; align-items:center; justify-content:center;">
+              <i class="fas fa-spinner fa-spin" style="font-size:1.2rem; color:var(--accent);"></i>
+            </div>
+            <div style="font-size:0.88rem; font-weight:600; color:var(--accent);">Identifying food...</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Analyzing image for nutrition info</div>
+          </div>
+
+          <!-- AI Result -->
+          <div id="aiResult" style="display:none;"></div>
+          <div id="photoLogStatus"></div>
+        </div>
+      </div>
+
+      <!-- Search & Manual -->
+      <div class="hs-card">
+        <div class="hs-card-header"><h3><i class="fas fa-search"></i> Search / Manual</h3></div>
+        <div class="hs-card-body">
+          <div class="food-search-box">
+            <input type="text" class="hs-input" id="foodSearch" placeholder="Search... (Roti, Apple, Biryani, Dal)" oninput="searchFood(this.value)">
+            <div class="food-results" id="foodResults"></div>
+          </div>
+          <div id="logStatus"></div>
+
+          <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
+            <div style="font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:10px;">Quick Add</div>
+            <div style="display:flex; gap:8px;">
+              <input type="text" class="hs-input" id="manualName" placeholder="Food name" style="flex:2;">
+              <input type="number" class="hs-input" id="manualCal" placeholder="kcal" style="flex:1;">
+              <button class="btn-hs btn-hs-primary" onclick="logManual()"><i class="fas fa-plus"></i></button>
+            </div>
+          </div>
+
+          <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
+            <div style="font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:10px;">
+              <i class="fas fa-barcode"></i> Barcode Scanner
+            </div>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+              <input type="text" class="hs-input" id="barcodeInput" placeholder="Enter barcode number" style="flex:1;">
+              <button class="btn-hs btn-hs-outline" onclick="lookupBarcode()" title="Search barcode"><i class="fas fa-search"></i></button>
+              <button class="btn-hs btn-hs-primary" onclick="openBarcodeScanner()" title="Scan with camera"><i class="fas fa-barcode"></i></button>
+            </div>
+            <div id="barcodeStatus" style="font-size:0.78rem; min-height:18px;"></div>
+            <!-- Barcode scanner modal -->
+            <div id="barcodeScannerWrap" style="display:none; margin-top:10px; border-radius:10px; overflow:hidden; border:1px solid var(--border); position:relative;">
+              <video id="barcodeVideo" autoplay playsinline style="width:100%; max-height:220px; object-fit:cover; background:#000;"></video>
+              <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none;">
+                <div style="width:65%; height:40%; border:2px solid var(--accent); border-radius:8px; opacity:0.7;"></div>
+              </div>
+              <div style="position:absolute; bottom:8px; left:0; right:0; text-align:center;">
+                <button class="btn-hs btn-hs-ghost" onclick="closeBarcodeScanner()" style="font-size:0.72rem; padding:4px 12px;">
+                  <i class="fas fa-xmark"></i> Close Scanner
+                </button>
+              </div>
+            </div>
+            <div id="barcodeResult" style="display:none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// CAMERA SYSTEM — Real WebRTC In-Browser Camera
+// ═══════════════════════════════════════════════════════════════════════
+let cameraStream = null;
+let facingMode = 'environment'; // Back camera by default (for food)
+
+async function openCamera() {
+  const modal = document.getElementById('cameraModal');
+  const video = document.getElementById('cameraVideo');
+  const errorDiv = document.getElementById('cameraError');
+
+  modal.classList.add('show');
+  errorDiv.style.display = 'none';
+  video.style.display = 'block';
+
+  try {
+    // Stop existing stream
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+    }
+
+    // Request camera access
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    video.srcObject = cameraStream;
+
+  } catch (err) {
+    console.error('Camera error:', err);
+    video.style.display = 'none';
+    errorDiv.style.display = 'block';
+
+    if (err.name === 'NotAllowedError') {
+      errorDiv.innerHTML = `
+        <i class="fas fa-camera-slash" style="font-size:2rem; margin-bottom:12px; display:block; opacity:0.5;"></i>
+        <strong>Camera access denied</strong><br><br>
+        Please allow camera access in your browser:<br>
+        1. Click the <strong>lock icon</strong> (🔒) in the address bar<br>
+        2. Set Camera to <strong>"Allow"</strong><br>
+        3. Refresh the page and try again<br><br>
+        <em>Or use "Upload Photo" to select an image from your files.</em>
+      `;
+    } else if (err.name === 'NotFoundError') {
+      errorDiv.innerHTML = `
+        <i class="fas fa-video-slash" style="font-size:2rem; margin-bottom:12px; display:block; opacity:0.5;"></i>
+        <strong>No camera found</strong><br><br>
+        Your device doesn't have a camera, or it's being used by another app.<br><br>
+        Use <strong>"Upload Photo"</strong> to select an existing image instead.
+      `;
+    } else {
+      errorDiv.innerHTML = `
+        <i class="fas fa-exclamation-triangle" style="font-size:2rem; margin-bottom:12px; display:block; opacity:0.5;"></i>
+        <strong>Camera error:</strong> ${err.message}<br><br>
+        Try using <strong>"Upload Photo"</strong> instead.
+      `;
+    }
+  }
+}
+
+function closeCamera() {
+  const modal = document.getElementById('cameraModal');
+  modal.classList.remove('show');
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+}
+
+async function switchCamera() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+  }
+  await openCamera();
+}
+
+function capturePhoto() {
+  const video = document.getElementById('cameraVideo');
+  const canvas = document.getElementById('cameraCanvas');
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
+
+  // Get image as blob
+  canvas.toBlob(async (blob) => {
+    closeCamera();
+    showPreview(blob);
+    await recognizeFood(blob);
+  }, 'image/jpeg', 0.85);
+}
+
+function handleGalleryImage(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  showPreview(file);
+  recognizeFood(file);
+}
+
+function showPreview(blob) {
+  const url = URL.createObjectURL(blob);
+  document.getElementById('snapPreview').src = url;
+  document.getElementById('snapSection').style.display = 'block';
+  document.getElementById('snapTrigger').style.display = 'none';
+}
+
+function retakePhoto() {
+  document.getElementById('snapSection').style.display = 'none';
+  document.getElementById('snapTrigger').style.display = 'flex';
+  document.getElementById('aiResult').style.display = 'none';
+  document.getElementById('aiProcessing').style.display = 'none';
+  document.getElementById('photoLogStatus').innerHTML = '';
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// FOOD RECOGNITION
+// ═══════════════════════════════════════════════════════════════════════
+async function recognizeFood(blob) {
+  document.getElementById('aiProcessing').style.display = 'block';
+  document.getElementById('aiResult').style.display = 'none';
+
+  const formData = new FormData();
+  formData.append('image', blob, 'food_photo.jpg');
+
+  try {
+    const resp = await fetch('/api/food/recognize', { method: 'POST', body: formData });
+    const data = await resp.json();
+
+    document.getElementById('aiProcessing').style.display = 'none';
+
+    if (data.success && data.food) {
+      const f = data.food;
+      const cc = f.confidence || 'medium';
+      const cat = f.category || 'Food';
+      const fiber = (f.fiber !== undefined && f.fiber !== null) ? f.fiber : 0;
+      document.getElementById('aiResult').innerHTML = `
+        <div class="ai-result-card">
+          <div class="ai-food-name">
+            <i class="fas fa-utensils" style="color:var(--accent);"></i>
+            <input type="text" id="aiName" value="${f.name}" class="hs-input" style="flex:1; font-weight:700; font-size:0.92rem;">
+            <span class="conf-badge ${cc}">${cc}</span>
+          </div>
+          <div style="margin-bottom:10px;">
+            <span class="food-category-badge">${cat}</span>
+          </div>
+          <div class="ai-macros">
+            <div class="ai-macro">
+              <div class="am-val" style="color:var(--warning);"><input type="number" id="aiCal" value="${f.calories}" class="hs-input" style="width:100%; text-align:center; font-weight:700; padding:4px; font-size:0.95rem;"></div>
+              <div class="am-label">Calories</div>
+            </div>
+            <div class="ai-macro">
+              <div class="am-val" style="color:var(--accent);">${f.protein||0}g</div>
+              <div class="am-label">Protein</div>
+            </div>
+            <div class="ai-macro">
+              <div class="am-val" style="color:#3b82f6;">${f.carbs||0}g</div>
+              <div class="am-label">Carbs</div>
+            </div>
+            <div class="ai-macro">
+              <div class="am-val" style="color:#f97316;">${f.fat||0}g</div>
+              <div class="am-label">Fat</div>
+            </div>
+          </div>
+          <div class="food-nutrition-row" style="margin-bottom:10px; padding:8px 10px; background:var(--bg-primary); border-radius:6px;">
+            <span>🌿 <strong>${fiber}g</strong> fiber</span>
+            ${f.detected_name ? `<span style="color:var(--text-muted);"><i class="fas fa-eye"></i> Detected as "${f.detected_name}"</span>` : ''}
+            <span style="color:var(--text-muted);">Source: ${(f.source||'ai').replace('_',' ')}</span>
+          </div>
+          ${f.note ? `<div style="font-size:0.78rem; color:var(--warning); margin-bottom:10px; padding:8px; background:var(--warning-bg); border-radius:6px;"><i class="fas fa-info-circle"></i> ${f.note}</div>` : ''}
+          <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:10px;">
+            <i class="fas fa-pencil"></i> You can edit the food name and calories above before logging.
+          </div>
+          <button class="btn-hs btn-hs-primary w-100" style="padding:12px;" onclick="logAiFood()">
+            <i class="fas fa-plus-circle"></i> Log This Food
+          </button>
+        </div>`;
+      document.getElementById('aiResult').style.display = 'block';
+      window._aiFood = f;
+    }
+  } catch(e) {
+    document.getElementById('aiProcessing').style.display = 'none';
+    document.getElementById('aiResult').innerHTML = `
+      <div style="color:var(--danger); padding:14px; font-size:0.85rem; background:var(--danger-bg); border-radius:8px; margin-top:12px;">
+        <i class="fas fa-xmark"></i> Error processing image. Please try again or use manual entry.
+      </div>`;
+    document.getElementById('aiResult').style.display = 'block';
+  }
+}
+
+async function logAiFood() {
+  const name = document.getElementById('aiName').value;
+  const cal = parseInt(document.getElementById('aiCal').value);
+  const f = window._aiFood || {};
+  const resp = await fetch('/api/food/log', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ food_name:name, calories:cal, protein:f.protein||0, carbs:f.carbs||0, fat:f.fat||0, source:'ai_photo' })});
+  const data = await resp.json();
+  document.getElementById('photoLogStatus').innerHTML = `<div style="color:var(--success); padding:10px; background:var(--success-bg); border-radius:8px; margin-top:8px; text-align:center;"><i class="fas fa-check-circle"></i> ${data.message}</div>`;
+  setTimeout(() => location.reload(), 1000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SEARCH & MANUAL
+// ═══════════════════════════════════════════════════════════════════════
+let searchTimeout;
+function searchFood(q) {
+  clearTimeout(searchTimeout);
+  const results = document.getElementById('foodResults');
+  if(q.length < 2) { results.classList.remove('show'); return; }
+  searchTimeout = setTimeout(async () => {
+    const resp = await fetch('/api/food/search?q=' + encodeURIComponent(q));
+    const data = await resp.json();
+    if(data.results.length) {
+      results.innerHTML = data.results.map(f => {
+        const safe = JSON.stringify(f).replace(/"/g, '&quot;');
+        const cat = f.category || 'Food';
+        const fiber = (f.fiber !== undefined && f.fiber !== null) ? f.fiber : 0;
+        return `
+          <div class="food-result-card" data-food="${safe}" onclick='logFood(${JSON.stringify(f)})'>
+            <div class="food-result-header">
+              <span class="food-result-name">${f.name}</span>
+              <span class="food-category-badge">${cat}</span>
+            </div>
+            <div class="food-nutrition-row">
+              <span>🔥 <strong>${f.calories}</strong> kcal</span>
+              <span>💪 ${f.protein||0}g protein</span>
+              <span>🍞 ${f.carbs||0}g carbs</span>
+              <span>🧈 ${f.fat||0}g fat</span>
+              <span>🌿 ${fiber}g fiber</span>
+            </div>
+          </div>`;
+      }).join('');
+      results.classList.add('show');
+    } else { results.innerHTML = '<div style="padding:14px; color:var(--text-muted); font-size:0.82rem;">No results found</div>'; results.classList.add('show'); }
+  }, 250);
+}
+
+async function logFood(food) {
+  await fetch('/api/food/log', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({food_name:food.name, calories:food.calories, protein:food.protein||0, carbs:food.carbs||0, fat:food.fat||0, source:'search', barcode:food.barcode||''})});
+  document.getElementById('foodResults').classList.remove('show');
+  document.getElementById('foodSearch').value = '';
+  location.reload();
+}
+
+async function logManual() {
+  const name = document.getElementById('manualName').value, cal = document.getElementById('manualCal').value;
+  if(!name || !cal) return;
+  await fetch('/api/food/log', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({food_name:name, calories:parseInt(cal), source:'manual'})});
+  location.reload();
+}
+
+async function lookupBarcode(code) {
+  const bc = code || document.getElementById('barcodeInput').value; if(!bc) return;
+  document.getElementById('barcodeStatus').innerHTML = '<span style="color:var(--accent);"><i class="fas fa-spinner fa-spin"></i> Looking up barcode...</span>';
+  const resp = await fetch('/api/food/barcode', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({barcode:bc})});
+  const data = await resp.json();
+  if(data.found) {
+    const f = data.food;
+    document.getElementById('barcodeStatus').innerHTML = '';
+    document.getElementById('barcodeResult').innerHTML = `
+      <div class="ai-result-card" style="margin-top:10px;">
+        <div class="ai-food-name">
+          <i class="fas fa-box" style="color:var(--accent);"></i>
+          <input type="text" id="bcName" value="${f.name}${f.brand ? ' ('+f.brand+')' : ''}" class="hs-input" style="flex:1; font-weight:700; font-size:0.88rem;">
+        </div>
+        ${f.image ? `<img src="${f.image}" style="height:60px; border-radius:6px; margin:8px 0; border:1px solid var(--border);">` : ''}
+        <div class="ai-macros">
+          <div class="ai-macro"><div class="am-val" style="color:var(--warning);"><input type="number" id="bcCal" value="${f.calories}" class="hs-input" style="width:100%; text-align:center; font-weight:700; padding:4px;"></div><div class="am-label">Calories</div></div>
+          <div class="ai-macro"><div class="am-val" style="color:var(--accent);">${f.protein||0}g</div><div class="am-label">Protein</div></div>
+          <div class="ai-macro"><div class="am-val" style="color:#3b82f6;">${f.carbs||0}g</div><div class="am-label">Carbs</div></div>
+          <div class="ai-macro"><div class="am-val" style="color:#f97316;">${f.fat||0}g</div><div class="am-label">Fat</div></div>
+        </div>
+        <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:8px;">
+          ${data.source === 'openfoodfacts' ? '<i class="fas fa-globe"></i> Data from Open Food Facts' : '<i class="fas fa-database"></i> Local database'}
+          &middot; Barcode: ${bc}
+        </div>
+        <button class="btn-hs btn-hs-primary w-100" style="padding:10px;" onclick="logBarcodeFood()">
+          <i class="fas fa-plus-circle"></i> Log This Food
+        </button>
+      </div>`;
+    document.getElementById('barcodeResult').style.display = 'block';
+    window._bcFood = f;
+  } else {
+    document.getElementById('barcodeStatus').innerHTML = `<span style="color:var(--danger);"><i class="fas fa-xmark"></i> ${data.message || 'Barcode not found'}</span>`;
+    document.getElementById('barcodeResult').style.display = 'none';
+  }
+}
+
+async function logBarcodeFood() {
+  const name = document.getElementById('bcName').value;
+  const cal = parseInt(document.getElementById('bcCal').value);
+  const f = window._bcFood || {};
+  await fetch('/api/food/log', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({food_name:name, calories:cal, protein:f.protein||0, carbs:f.carbs||0, fat:f.fat||0, source:'barcode', barcode:f.barcode||''})});
+  location.reload();
+}
+
+// ── Barcode Camera Scanner ──
+let barcodeStream = null;
+let barcodeInterval = null;
+
+async function openBarcodeScanner() {
+  const wrap = document.getElementById('barcodeScannerWrap');
+  const video = document.getElementById('barcodeVideo');
+  wrap.style.display = 'block';
+  document.getElementById('barcodeStatus').innerHTML = '<span style="color:var(--accent);">Point camera at barcode...</span>';
+
+  try {
+    barcodeStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} }
+    });
+    video.srcObject = barcodeStream;
+
+    // Use BarcodeDetector API (Chrome/Edge) or manual frame scanning
+    if ('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39'] });
+      barcodeInterval = setInterval(async () => {
+        try {
+          const barcodes = await detector.detect(video);
+          if (barcodes.length > 0) {
+            const code = barcodes[0].rawValue;
+            closeBarcodeScanner();
+            document.getElementById('barcodeInput').value = code;
+            document.getElementById('barcodeStatus').innerHTML = `<span style="color:var(--success);"><i class="fas fa-check"></i> Scanned: ${code}</span>`;
+            lookupBarcode(code);
+          }
+        } catch(e) {}
+      }, 500);
+    } else {
+      document.getElementById('barcodeStatus').innerHTML = `<span style="color:var(--warning);"><i class="fas fa-info-circle"></i> Auto-scan not supported in this browser. Point camera at barcode, then type the number manually.</span>`;
+    }
+  } catch(e) {
+    wrap.style.display = 'none';
+    document.getElementById('barcodeStatus').innerHTML = `<span style="color:var(--danger);"><i class="fas fa-camera-slash"></i> Camera access denied. Please allow camera or type barcode manually.</span>`;
+  }
+}
+
+function closeBarcodeScanner() {
+  if (barcodeInterval) { clearInterval(barcodeInterval); barcodeInterval = null; }
+  if (barcodeStream) { barcodeStream.getTracks().forEach(t => t.stop()); barcodeStream = null; }
+  document.getElementById('barcodeScannerWrap').style.display = 'none';
+}
+
+document.addEventListener('click', e => { if(!e.target.closest('.food-search-box')) document.getElementById('foodResults').classList.remove('show'); });
+// Close camera on Escape key
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeCamera(); });
+</script>
+{% endblock %}

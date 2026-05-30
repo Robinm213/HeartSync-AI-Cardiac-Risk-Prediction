@@ -25,8 +25,8 @@ DB_PATH  = os.path.join(BASE_DIR, 'data', 'users.db')
 SMTP_CONFIG = {
     'host':     os.getenv('SMTP_HOST', 'smtp.gmail.com'),
     'port':     int(os.getenv('SMTP_PORT', '587')),
-    'email':    os.getenv('SMTP_EMAIL', 'robinmandal105@gmail.com'),
-    'password': os.getenv('SMTP_PASSWORD', 'dkhbtqzboeasfwjl'),
+    'email':    os.getenv('SMTP_EMAIL', ''),
+    'password': os.getenv('SMTP_PASSWORD', ''),
     'use_tls':  True,
 }
 
